@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- FullCalendar CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/main.min.css" rel="stylesheet">
+
+    <!-- Font Awesome for icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            min-height: 100vh;
+            display: flex;
+        }
+        .sidebar {
+            width: 250px;
+            background-color: #343a40;
+            color: white;
+            
+        }
+        .sidebar a {
+            color: white;
+            text-decoration: none;
+            display: block;
+            padding: 10px 15px;
+        }
+        .sidebar a:hover {
+            background-color: #495057;
+        }
+        .content {
+            flex: 1;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .user-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        .user-list li {
+            padding: 5px 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        #calendar {
+            position: relative;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+    <h4 class="p-3 border-bottom">🏢 Company Name</h4>
+    <a href="#" id="dashboardLink">📊 Dashboard</a>
+    <a href="#" id="departmentLink">📂 Department</a>
+    <a href="#" id="userPermissionLink">🔑 User Permission</a>
+    <a href="#" id="profileLink">👤 Profile</a>
+
+    <div class="border-top mt-3 p-3">
+        <h6>👤 Accounts</h6>
+        <ul id="userList" class="user-list">
+            <li>Loading...</li>
+        </ul>
+        <button id="logoutBtn" class="btn btn-danger btn-sm mt-2">Logout</button>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="content" id="mainContent"></div>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/6.1.11/index.global.min.js"></script>
+
+<script>
+let currentUser = null;
+let deptChartInstance = null;
+let roleChartInstance = null;
+let calendar = null;
+
+// Get token from localStorage
+function getToken() {
+    return localStorage.getItem("token");
+}
+
+// Fetch logged-in user using JWT
+async function fetchCurrentUser() {
+    const token = getToken();
+    if (!token) {
+        currentUser = null;
+        return null;
+    }
+
+    try {
+        const res = await fetch("http://localhost:3000/me", {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (!res.ok) { currentUser = null; return null; }
+        currentUser = await res.json();
+        return currentUser;
+    } catch (err) {
+        console.error("Error fetching user:", err);
+        return null;
+    }
+}
+
+// Show login required message
+function showLoginRequiredMessage() {
+    document.getElementById("mainContent").innerHTML = `
+        <h2>🔒 Please log in</h2>
+        <p>You must log in to view this section.</p>
+    `;
+}
+
+// General menu click handler
+async function handleMenuClick(loaderFunction) {
+    const user = await fetchCurrentUser();
+    if (!user) {
+        showLoginRequiredMessage();
+        return;
+    }
+    loaderFunction();
+}
+
+// Load User Permissions Overview
+async function loadUserPermissionsOverview() {
+    const token = getToken();
+    if (!token) return showLoginRequiredMessage();
+
+    let users;
+    try {
+        const res = await fetch("http://localhost:3000/users", {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        if (!res.ok) {
+            document.getElementById("mainContent").innerHTML = `<p class="text-danger">⚠️ Failed to load users</p>`;
+            return;
+        }
+
+        users = await res.json();
+    } catch (err) {
+        console.error("Error fetching users:", err);
+        document.getElementById("mainContent").innerHTML = `<p class="text-danger">⚠️ Error fetching users</p>`;
+        return;
+    }
+
+    let tableHTML = `
+        <h2>User Permissions</h2>
+        <table class="table table-bordered table-striped">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    users.forEach(u => {
+        tableHTML += `
+            <tr>
+                <td>${u.username}</td>
+                <td>${u.role}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary view-btn" data-id="${u.id}">View Permissions</button>
+                </td>
+            </tr>
+        `;
+    });
+
+    tableHTML += `</tbody></table>`;
+    document.getElementById("mainContent").innerHTML = tableHTML;
+
+    document.querySelectorAll(".view-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const userId = btn.dataset.id;
+            loadUserPermissionsDetail(userId);
+        });
+    });
+}
+
+// Load User Permissions Detail
+async function loadUserPermissionsDetail(userId) {
+    const token = getToken();
+    if (!token) return showLoginRequiredMessage();
+
+    let user;
+    try {
+        const res = await fetch(`http://localhost:3000/users/${userId}`, { 
+            headers: { "Authorization": `Bearer ${token}` } 
+        });
+
+        if (!res.ok) {
+            document.getElementById("mainContent").innerHTML = `
+                <p class="text-danger">⚠️ Failed to load user details (ID: ${userId})</p>
+            `;
+            return;
+        }
+
+        user = await res.json();
+    } catch (err) {
+        console.error("Error fetching user:", err);
+        document.getElementById("mainContent").innerHTML = `
+            <p class="text-danger">⚠️ Error fetching user data</p>
+        `;
+        return;
+    }
+
+    const permissions = [
+        { key: "can_add_stock", label: "Add Stock", value: user.can_add_stock },
+        { key: "can_view_stock", label: "View Stock", value: user.can_view_stock },
+        { key: "can_edit_stock", label: "Edit Stock", value: user.can_edit_stock },
+        { key: "can_delete_stock", label: "Delete Stock", value: user.can_delete_stock },
+        { key: "can_add_department", label: "Add Department", value: user.can_add_department },
+        { key: "can_assign_department_member", label: "Assign Department Member", value: user.can_assign_department_member }
+    ];
+
+    permissions.sort((a, b) => b.value - a.value);
+
+    let html = `
+        <h2>Permissions for ${user.username}</h2>
+        <ul id="permList" class="list-group mb-3">
+    `;
+
+    permissions.forEach(p => {
+        html += `
+            <li class="list-group-item d-flex justify-content-between align-items-center" data-key="${p.key}">
+                <span>${p.label}</span>
+                <input type="checkbox" class="perm-checkbox" ${p.value ? "checked" : ""}>
+            </li>
+        `;
+    });
+
+    html += `</ul>
+        <button id="savePermsBtn" class="btn btn-success">Save</button>
+        <button id="backBtn" class="btn btn-secondary ms-2">Back</button>
+    `;
+
+    document.getElementById("mainContent").innerHTML = html;
+
+    if (window.$) {
+        $("#permList").sortable();
+        $("#permList").disableSelection();
+    }
+
+    document.getElementById("savePermsBtn").addEventListener("click", async () => {
+        const data = {};
+        document.querySelectorAll("#permList li").forEach(li => {
+            const key = li.dataset.key;
+            data[key] = li.querySelector(".perm-checkbox").checked ? 1 : 0;
+        });
+
+        try {
+            const updateRes = await fetch(`http://localhost:3000/users/${userId}`, {
+                method: "PUT",
+                headers: { 
+                    "Content-Type": "application/json", 
+                    "Authorization": `Bearer ${token}` 
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (updateRes.ok) {
+                alert("Permissions updated!");
+                loadUserPermissionsOverview();
+            } else {
+                const errText = await updateRes.text();
+                alert("Failed to update permissions: " + errText);
+            }
+        } catch (err) {
+            console.error("Error updating permissions:", err);
+            alert("Error updating permissions");
+        }
+    });
+
+    document.getElementById("backBtn").addEventListener("click", loadUserPermissionsOverview);
+}
+
+// Load Profile
+function loadProfile() {
+    if (!currentUser) return showLoginRequiredMessage();
+
+    document.getElementById("mainContent").innerHTML = `
+        <h2>Profile</h2>
+        <table class="table table-striped table-bordered w-50">
+            <tbody>
+                <tr><th>Username</th><td>${currentUser.username}</td></tr>
+                <tr><th>Role</th><td>${currentUser.role}</td></tr>
+                <tr><th>Can Add Stock</th><td>${currentUser.can_add_stock ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>'}</td></tr>
+                <tr><th>Can View Stock</th><td>${currentUser.can_view_stock ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>'}</td></tr>
+                <tr><th>Can Edit Stock</th><td>${currentUser.can_edit_stock ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>'}</td></tr>
+                <tr><th>Can Delete Stock</th><td>${currentUser.can_delete_stock ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>'}</td></tr>
+                <tr><th>Can Add Department</th><td>${currentUser.can_add_department ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>'}</td></tr>
+                <tr><th>Can Assign Department Member</th><td>${currentUser.can_assign_department_member ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>'}</td></tr>
+            </tbody>
+        </table>
+    `;
+}
+
+// Load user list in Accounts section
+async function loadUserList() {
+    const user = await fetchCurrentUser();
+    if (!user) {
+        document.getElementById("userList").innerHTML = `<li>Not logged in</li>`;
+        return;
+    }
+    const res = await fetch("http://localhost:3000/users", {
+        headers: { "Authorization": `Bearer ${getToken()}` }
+    });
+    if (!res.ok) {
+        document.getElementById("userList").innerHTML = `<li>Unable to load users</li>`;
+        return;
+    }
+    const users = await res.json();
+    document.getElementById("userList").innerHTML = users.map(u => `<li>${u.username} (${u.role})</li>`).join("");
+}
+
+// Departments loader
+async function loadDepartments() {
+    const token = getToken();
+    if (!token) return showLoginRequiredMessage();
+
+    document.getElementById("mainContent").innerHTML = `<h3>Departments</h3><p>⏳ Loading departments...</p>`;
+
+    try {
+        const res = await fetch("http://localhost:3000/api/departments", {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error("Failed to load departments");
+        const depts = await res.json();
+
+        let html = `
+            <div class="card">
+                <div class="card-header bg-primary text-white"><h4 class="mb-0">Departments</h4></div>
+                <div class="card-body">
+                    <div id="deptAddSection" class="mb-3 d-flex gap-2">
+                        <input type="text" id="deptName" class="form-control" placeholder="Enter department name">
+                        <button id="addDeptBtn" class="btn btn-success">Add</button>
+                    </div>
+                    <table class="table table-bordered table-striped">
+                        <thead><tr><th>Name</th><th>Action</th></tr></thead>
+                        <tbody>
+        `;
+        depts.forEach(d => {
+            html += `<tr>
+                        <td>${d.name}</td>
+                        <td>
+                            ${currentUser.role === "master" || currentUser.can_delete_department
+                                ? `<button class="btn btn-sm btn-danger delete-btn" data-id="${d.id}">Delete</button>`
+                                : `<button class="btn btn-sm btn-secondary" disabled>Locked</button>`
+                            }
+                        </td>
+                     </tr>`;
+        });
+        html += `</tbody></table></div></div>`;
+        document.getElementById("mainContent").innerHTML = html;
+
+        if (currentUser.role !== "master" && !currentUser.can_add_department) {
+            document.getElementById("deptAddSection").style.display = "none";
+        }
+
+        document.getElementById("addDeptBtn")?.addEventListener("click", async () => {
+            const name = document.getElementById("deptName").value.trim();
+            if (!name) return alert("Enter a department name");
+            const res = await fetch("http://localhost:3000/api/departments", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ name })
+            });
+            if (res.ok) { alert("Department added!"); loadDepartments(); }
+            else alert("Failed to add department");
+        });
+
+        document.querySelectorAll(".delete-btn").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                if (!confirm("Delete this department?")) return;
+                const deptId = btn.dataset.id;
+                const delRes = await fetch(`http://localhost:3000/api/departments/${deptId}`, {
+                    method: "DELETE",
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (delRes.ok) { alert("Department deleted"); loadDepartments(); }
+                else alert("Failed to delete department");
+            });
+        });
+
+    } catch (err) {
+        console.error(err);
+        document.getElementById("mainContent").innerHTML = `<h3>Departments</h3><p class="text-danger">⚠️ Failed to load departments.</p>`;
+    }
+}
+
+// Function to greet user based on time
+function getGreeting() {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 18) return "Good Afternoon";
+    return "Good Evening";
+}
+
+// Load Dashboard
+async function loadDashboard() {
+    const user = await fetchCurrentUser();
+    if (!user) return showLoginRequiredMessage();
+
+    document.getElementById("mainContent").innerHTML = `
+        <div class="mb-4">
+            <h2>${getGreeting()}, ${user.username} 👋</h2>
+            <p>Here’s a quick overview of your system.</p>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card p-3 shadow-sm">
+                    <h5>Department Overview</h5>
+                    <div style="height:300px">
+                        <canvas id="deptChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card p-3 shadow-sm">
+                    <h5>User Roles</h5>
+                    <div style="height:300px">
+                        <canvas id="roleChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card p-3 shadow-sm">
+                    <h5>Calendar</h5>
+                    <div id="calendar"></div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Destroy old charts before recreating
+    if (deptChartInstance) deptChartInstance.destroy();
+    if (roleChartInstance) roleChartInstance.destroy();
+
+    // Department Chart
+    try {
+        const deptCtx = document.getElementById("deptChart").getContext("2d");
+        deptChartInstance = new Chart(deptCtx, {
+            type: "bar",
+            data: {
+                labels: ["IT", "HR", "Sales", "Marketing", "Finance"],
+                datasets: [{
+                    label: "Members",
+                    data: [12, 8, 15, 7, 10],
+                    backgroundColor: "rgba(54, 162, 235, 0.7)"
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    } catch (err) {
+        console.error("Error initializing department chart:", err);
+    }
+
+    // Role Chart
+    try {
+        const roleCtx = document.getElementById("roleChart").getContext("2d");
+        roleChartInstance = new Chart(roleCtx, {
+            type: "pie",
+            data: {
+                labels: ["Admin", "Manager", "Staff"],
+                datasets: [{
+                    data: [3, 5, 12],
+                    backgroundColor: [
+                        "rgba(255, 99, 132, 0.7)",
+                        "rgba(54, 162, 235, 0.7)",
+                        "rgba(255, 206, 86, 0.7)"
+                    ]
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    } catch (err) {
+        console.error("Error initializing role chart:", err);
+    }
+
+    // Initialize Calendar with delay and error handling
+    const initializeCalendar = () => {
+        try {
+            if (typeof FullCalendar === "undefined") {
+                console.error("FullCalendar library not loaded!");
+                document.getElementById("calendar").innerHTML = `<p class="text-danger">Failed to load calendar. Please check your internet connection or try again later.</p>`;
+                return;
+            }
+
+            if (calendar) calendar.destroy();
+            const calendarEl = document.getElementById("calendar");
+            if (calendarEl) {
+                calendar = new FullCalendar.Calendar(calendarEl, {
+                    initialView: 'dayGridMonth',
+                    height: 500,
+                    events: [
+                        { title: 'Team Meeting', start: '2025-08-21' },
+                        { title: 'Project Deadline', start: '2025-08-25' },
+                        { title: 'HR Event', start: '2025-08-28' }
+                    ]
+                });
+                calendar.render();
+                console.log("Calendar initialized successfully");
+            } else {
+                console.error("Calendar element not found!");
+                document.getElementById("calendar").innerHTML = `<p class="text-danger">Calendar element not found!</p>`;
+            }
+        } catch (err) {
+            console.error("Error initializing calendar:", err);
+            document.getElementById("calendar").innerHTML = `<p class="text-danger">Error loading calendar: ${err.message}</p>`;
+        }
+    };
+
+    // Delay calendar initialization to ensure script is loaded
+    setTimeout(initializeCalendar, 100);
+}
+
+// Logout
+document.getElementById("logoutBtn").addEventListener("click", () => {
+    localStorage.removeItem("token");
+    currentUser = null;
+    showLoginRequiredMessage();
+    loadUserList();
+    window.location.href = "login.html";
+});
+
+// Sidebar navigation events
+document.getElementById("departmentLink").addEventListener("click", async (e) => {
+    e.preventDefault();
+    document.getElementById("mainContent").innerHTML = `
+        <div class="text-center my-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p>Loading departments...</p>
+        </div>
+    `;
+    handleMenuClick(loadDepartments);
+});
+
+document.getElementById("userPermissionLink").addEventListener("click", (e) => {
+    e.preventDefault();
+    document.getElementById("mainContent").innerHTML = `
+        <div class="text-center my-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p>Loading user permissions...</p>
+        </div>
+    `;
+    handleMenuClick(loadUserPermissionsOverview);
+});
+
+document.getElementById("profileLink").addEventListener("click", (e) => {
+    e.preventDefault();
+    handleMenuClick(loadProfile);
+});
+
+// Initial load
+loadUserList();
+
+// Load dashboard on page load
+window.addEventListener("DOMContentLoaded", () => {
+    loadUserList();
+    loadDashboard();
+});
+</script>
+
+</body>
+</html>
