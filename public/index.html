@@ -23,7 +23,6 @@
             width: 250px;
             background-color: #343a40;
             color: white;
-            
         }
         .sidebar a {
             color: white;
@@ -39,17 +38,55 @@
             padding: 20px;
             background: #f8f9fa;
         }
-        .user-list {
-            list-style: none;
-            padding-left: 0;
-        }
-        .user-list li {
-            padding: 5px 10px;
-            border-bottom: 1px solid rgba(255,255,255,0.2);
-        }
         #calendar {
             position: relative;
             z-index: 1;
+        }
+        #clock {
+            font-family: monospace;
+            font-size: 1.2rem;
+        }
+        /* Ensure calendar fits well in smaller size */
+        .fc {
+            font-size: 0.85em; /* Smaller font for calendar */
+        }
+        .fc .fc-daygrid-day {
+            height: 2.5em; /* Reduce day cell height */
+        }
+        .fc .fc-daygrid-day-frame {
+            padding: 2px; /* Reduce padding for compactness */
+        }
+        /* Style for sortable column headers */
+        .sortable {
+            cursor: pointer;
+            position: relative;
+            padding-right: 20px;
+        }
+        .sortable::after {
+            content: '\f0dc'; /* Font Awesome sort icon */
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            position: absolute;
+            right: 8px;
+            opacity: 0.5;
+        }
+        .sortable.asc::after {
+            content: '\f0de'; /* Font Awesome sort-up icon */
+            opacity: 1;
+        }
+        .sortable.desc::after {
+            content: '\f0dd'; /* Font Awesome sort-down icon */
+            opacity: 1;
+        }
+        /* Pagination styles */
+        .pagination {
+            margin-top: 15px;
+            justify-content: center;
+        }
+        /* Logout button styling */
+        .logout-btn-container {
+            padding: 10px 15px;
+            border-top: 1px solid rgba(255,255,255,0.2);
         }
     </style>
 </head>
@@ -62,13 +99,8 @@
     <a href="#" id="departmentLink">📂 Department</a>
     <a href="#" id="userPermissionLink">🔑 User Permission</a>
     <a href="#" id="profileLink">👤 Profile</a>
-
-    <div class="border-top mt-3 p-3">
-        <h6>👤 Accounts</h6>
-        <ul id="userList" class="user-list">
-            <li>Loading...</li>
-        </ul>
-        <button id="logoutBtn" class="btn btn-danger btn-sm mt-2">Logout</button>
+    <div class="logout-btn-container">
+        <button id="logoutBtn" class="btn btn-danger btn-sm w-100">Logout</button>
     </div>
 </div>
 
@@ -86,6 +118,7 @@ let currentUser = null;
 let deptChartInstance = null;
 let roleChartInstance = null;
 let calendar = null;
+let clockInterval = null;
 
 // Get token from localStorage
 function getToken() {
@@ -131,14 +164,15 @@ async function handleMenuClick(loaderFunction) {
     loaderFunction();
 }
 
-// Load User Permissions Overview
-async function loadUserPermissionsOverview() {
+// Load User Permissions Overview with server-side pagination
+async function loadUserPermissionsOverview(page = 1) {
     const token = getToken();
     if (!token) return showLoginRequiredMessage();
 
-    let users;
+    const usersPerPage = 2;
+    let users, totalPages;
     try {
-        const res = await fetch("http://localhost:3000/users", {
+        const res = await fetch(`http://localhost:3000/users?page=${page}&limit=${usersPerPage}`, {
             headers: { "Authorization": `Bearer ${token}` }
         });
 
@@ -147,20 +181,30 @@ async function loadUserPermissionsOverview() {
             return;
         }
 
-        users = await res.json();
+        const data = await res.json();
+        if (!Array.isArray(data.users)) {
+            console.error("Expected users to be an array, got:", data.users);
+            document.getElementById("mainContent").innerHTML = `<p class="text-danger">⚠️ Invalid user data</p>`;
+            return;
+        }
+        users = data.users;
+        totalPages = data.totalPages || Math.ceil(data.totalUsers / usersPerPage);
     } catch (err) {
         console.error("Error fetching users:", err);
         document.getElementById("mainContent").innerHTML = `<p class="text-danger">⚠️ Error fetching users</p>`;
         return;
     }
 
-    let tableHTML = `
+    let html = `
         <h2>User Permissions</h2>
-        <table class="table table-bordered table-striped">
+        <div class="mb-3">
+            <input type="text" id="userSearch" class="form-control" placeholder="Search users by username...">
+        </div>
+        <table class="table table-bordered table-striped" id="usersTable">
             <thead>
                 <tr>
-                    <th>Username</th>
-                    <th>Role</th>
+                    <th class="sortable" data-sort="username">Username</th>
+                    <th class="sortable" data-sort="role">Role</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -168,7 +212,7 @@ async function loadUserPermissionsOverview() {
     `;
 
     users.forEach(u => {
-        tableHTML += `
+        html += `
             <tr>
                 <td>${u.username}</td>
                 <td>${u.role}</td>
@@ -179,13 +223,173 @@ async function loadUserPermissionsOverview() {
         `;
     });
 
-    tableHTML += `</tbody></table>`;
-    document.getElementById("mainContent").innerHTML = tableHTML;
+    html += `</tbody></table>`;
 
+    // Add pagination controls
+    html += `
+        <nav aria-label="User pagination">
+            <ul class="pagination">
+                <li class="page-item ${page === 1 ? 'disabled' : ''}">
+                    <button class="page-link" ${page === 1 ? 'disabled' : ''} data-page="${page - 1}">Previous</button>
+                </li>
+    `;
+
+    // Determine the range of pages to show (only 2 pages at a time)
+    let startPage = Math.max(1, page - 1);
+    let endPage = Math.min(totalPages, startPage + 1);
+    if (endPage - startPage < 1 && startPage > 1) {
+        startPage = Math.max(1, endPage - 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+        html += `
+            <li class="page-item ${i === page ? 'active' : ''}">
+                <button class="page-link" data-page="${i}">${i}</button>
+            </li>
+        `;
+    }
+
+    html += `
+                <li class="page-item ${page === totalPages ? 'disabled' : ''}">
+                    <button class="page-link" ${page === totalPages ? 'disabled' : ''} data-page="${page + 1}">Next</button>
+                </li>
+            </ul>
+        </nav>
+    `;
+
+    document.getElementById("mainContent").innerHTML = html;
+
+    // Event listener for View buttons
     document.querySelectorAll(".view-btn").forEach(btn => {
         btn.addEventListener("click", () => {
             const userId = btn.dataset.id;
             loadUserPermissionsDetail(userId);
+        });
+    });
+
+    // Search functionality with server-side pagination
+    const searchInput = document.getElementById("userSearch");
+    searchInput.addEventListener("input", async () => {
+        const query = searchInput.value.trim();
+        try {
+            const res = await fetch(`http://localhost:3000/users?search=${encodeURIComponent(query)}&page=${page}&limit=${usersPerPage}`, {
+                headers: { "Authorization": `Bearer ${getToken()}` }
+            });
+            if (!res.ok) throw new Error("Failed to fetch users");
+
+            const data = await res.json();
+            if (!Array.isArray(data.users)) {
+                console.error("Expected users to be an array, got:", data.users);
+                document.querySelector("#usersTable tbody").innerHTML = `<tr><td colspan="3" class="text-danger">Invalid user data</td></tr>`;
+                return;
+            }
+            users = data.users;
+            totalPages = data.totalPages || Math.ceil(data.totalUsers / usersPerPage);
+
+            const tbody = document.querySelector("#usersTable tbody");
+            tbody.innerHTML = users.map(u => `
+                <tr>
+                    <td>${u.username}</td>
+                    <td>${u.role}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary view-btn" data-id="${u.id}">View Permissions</button>
+                    </td>
+                </tr>
+            `).join("");
+
+            // Update pagination controls
+            const pagination = document.querySelector(".pagination");
+            pagination.innerHTML = `
+                <li class="page-item ${page === 1 ? 'disabled' : ''}">
+                    <button class="page-link" ${page === 1 ? 'disabled' : ''} data-page="${page - 1}">Previous</button>
+                </li>
+            `;
+
+            // Determine the range of pages to show (only 2 pages at a time)
+            let startPage = Math.max(1, page - 1);
+            let endPage = Math.min(totalPages, startPage + 1);
+            if (endPage - startPage < 1 && startPage > 1) {
+                startPage = Math.max(1, endPage - 1);
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                pagination.innerHTML += `
+                    <li class="page-item ${i === page ? 'active' : ''}">
+                        <button class="page-link" data-page="${i}">${i}</button>
+                    </li>
+                `;
+            }
+
+            pagination.innerHTML += `
+                <li class="page-item ${page === totalPages ? 'disabled' : ''}">
+                    <button class="page-link" ${page === totalPages ? 'disabled' : ''} data-page="${page + 1}">Next</button>
+                </li>
+            `;
+
+            // Re-attach pagination event listeners
+            document.querySelectorAll(".page-link").forEach(button => {
+                button.addEventListener("click", () => {
+                    const newPage = parseInt(button.dataset.page);
+                    if (newPage) {
+                        localStorage.setItem("currentPage", "userPermissions");
+                        loadUserPermissionsOverview(newPage);
+                    }
+                });
+            });
+
+            // Re-attach view button listeners
+            document.querySelectorAll(".view-btn").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    loadUserPermissionsDetail(btn.dataset.id);
+                });
+            });
+        } catch (err) {
+            console.error(err);
+            document.querySelector("#usersTable tbody").innerHTML = `<tr><td colspan="3" class="text-danger">Error loading users</td></tr>`;
+        }
+    });
+
+    // Table sorting functionality (client-side)
+    let sortDirection = { username: 1, role: 1 }; // 1 for ascending, -1 for descending
+    const sortTable = (column, direction) => {
+        const tbody = document.querySelector("#usersTable tbody");
+        const rows = Array.from(tbody.querySelectorAll("tr"));
+
+        rows.sort((a, b) => {
+            const aValue = a.cells[column === "username" ? 0 : 1].textContent.toLowerCase();
+            const bValue = b.cells[column === "username" ? 0 : 1].textContent.toLowerCase();
+            return direction * (aValue > bValue ? 1 : aValue < bValue ? -1 : 0);
+        });
+
+        tbody.innerHTML = "";
+        rows.forEach(row => tbody.appendChild(row));
+    };
+
+    // Add sorting event listeners
+    document.querySelectorAll(".sortable").forEach(header => {
+        header.addEventListener("click", () => {
+            const column = header.dataset.sort;
+            sortDirection[column] = sortDirection[column] === 1 ? -1 : 1;
+
+            // Update sort indicators
+            document.querySelectorAll(".sortable").forEach(h => {
+                h.classList.remove("asc", "desc");
+            });
+            header.classList.add(sortDirection[column] === 1 ? "asc" : "desc");
+
+            // Sort table
+            sortTable(column, sortDirection[column]);
+        });
+    });
+
+    // Pagination event listeners
+    document.querySelectorAll(".page-link").forEach(button => {
+        button.addEventListener("click", () => {
+            const newPage = parseInt(button.dataset.page);
+            if (newPage) {
+                localStorage.setItem("currentPage", "userPermissions");
+                loadUserPermissionsOverview(newPage);
+            }
         });
     });
 }
@@ -273,6 +477,7 @@ async function loadUserPermissionsDetail(userId) {
 
             if (updateRes.ok) {
                 alert("Permissions updated!");
+                localStorage.setItem("currentPage", "userPermissions");
                 loadUserPermissionsOverview();
             } else {
                 const errText = await updateRes.text();
@@ -284,7 +489,10 @@ async function loadUserPermissionsDetail(userId) {
         }
     });
 
-    document.getElementById("backBtn").addEventListener("click", loadUserPermissionsOverview);
+    document.getElementById("backBtn").addEventListener("click", () => {
+        localStorage.setItem("currentPage", "userPermissions");
+        loadUserPermissionsOverview();
+    });
 }
 
 // Load Profile
@@ -306,24 +514,6 @@ function loadProfile() {
             </tbody>
         </table>
     `;
-}
-
-// Load user list in Accounts section
-async function loadUserList() {
-    const user = await fetchCurrentUser();
-    if (!user) {
-        document.getElementById("userList").innerHTML = `<li>Not logged in</li>`;
-        return;
-    }
-    const res = await fetch("http://localhost:3000/users", {
-        headers: { "Authorization": `Bearer ${getToken()}` }
-    });
-    if (!res.ok) {
-        document.getElementById("userList").innerHTML = `<li>Unable to load users</li>`;
-        return;
-    }
-    const users = await res.json();
-    document.getElementById("userList").innerHTML = users.map(u => `<li>${u.username} (${u.role})</li>`).join("");
 }
 
 // Departments loader
@@ -409,6 +599,20 @@ function getGreeting() {
     return "Good Evening";
 }
 
+// Function to format and update clock
+function updateClock() {
+    const now = new Date();
+    const hours = now.getHours() % 12 || 12; // Convert to 12-hour format
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const ampm = now.getHours() >= 12 ? 'PM' : 'AM';
+    const timeString = `${hours}:${minutes}:${seconds} ${ampm}`;
+    const clockElement = document.getElementById("clock");
+    if (clockElement) {
+        clockElement.textContent = timeString;
+    }
+}
+
 // Load Dashboard
 async function loadDashboard() {
     const user = await fetchCurrentUser();
@@ -417,7 +621,7 @@ async function loadDashboard() {
     document.getElementById("mainContent").innerHTML = `
         <div class="mb-4">
             <h2>${getGreeting()}, ${user.username} 👋</h2>
-            <p>Here’s a quick overview of your system.</p>
+            <p>Here’s a quick overview of your system. Current time: <span id="clock" class="badge bg-primary"></span></p>
         </div>
 
         <div class="row mb-4">
@@ -440,7 +644,7 @@ async function loadDashboard() {
         </div>
 
         <div class="row">
-            <div class="col-12">
+            <div class="col-6 mx-auto">
                 <div class="card p-3 shadow-sm">
                     <h5>Calendar</h5>
                     <div id="calendar"></div>
@@ -448,6 +652,11 @@ async function loadDashboard() {
             </div>
         </div>
     `;
+
+    // Start clock
+    updateClock(); // Initial call
+    if (clockInterval) clearInterval(clockInterval); // Clear any existing interval
+    clockInterval = setInterval(updateClock, 1000); // Update every second
 
     // Destroy old charts before recreating
     if (deptChartInstance) deptChartInstance.destroy();
@@ -508,12 +717,19 @@ async function loadDashboard() {
             if (calendarEl) {
                 calendar = new FullCalendar.Calendar(calendarEl, {
                     initialView: 'dayGridMonth',
-                    height: 500,
+                    height: 350, // Reduced height for smaller calendar
+                    dayMaxEvents: 2, // Limit events per day to avoid overflow
                     events: [
                         { title: 'Team Meeting', start: '2025-08-21' },
                         { title: 'Project Deadline', start: '2025-08-25' },
                         { title: 'HR Event', start: '2025-08-28' }
-                    ]
+                    ],
+                    eventDisplay: 'block', // Ensure events are compact
+                    headerToolbar: {
+                        left: 'prev,next',
+                        center: 'title',
+                        right: 'dayGridMonth' // Lock to month view
+                    }
                 });
                 calendar.render();
                 console.log("Calendar initialized successfully");
@@ -534,48 +750,102 @@ async function loadDashboard() {
 // Logout
 document.getElementById("logoutBtn").addEventListener("click", () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("currentPage"); // Clear current page on logout
     currentUser = null;
     showLoginRequiredMessage();
-    loadUserList();
     window.location.href = "login.html";
+    if (clockInterval) clearInterval(clockInterval); // Stop clock updates
 });
 
 // Sidebar navigation events
+document.getElementById("dashboardLink").addEventListener("click", (e) => {
+    e.preventDefault();
+    localStorage.setItem("currentPage", "dashboard");
+    document.getElementById("mainContent").innerHTML = `
+        <div class="text-center my-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p>Loading dashboard...</p>
+        </div>
+    `;
+    handleMenuClick(loadDashboard);
+});
+
 document.getElementById("departmentLink").addEventListener("click", async (e) => {
     e.preventDefault();
+    localStorage.setItem("currentPage", "departments");
     document.getElementById("mainContent").innerHTML = `
         <div class="text-center my-5">
             <div class="spinner-border text-primary" role="status"></div>
             <p>Loading departments...</p>
         </div>
     `;
+    if (clockInterval) clearInterval(clockInterval); // Stop clock updates
     handleMenuClick(loadDepartments);
 });
 
 document.getElementById("userPermissionLink").addEventListener("click", (e) => {
     e.preventDefault();
+    localStorage.setItem("currentPage", "userPermissions");
     document.getElementById("mainContent").innerHTML = `
         <div class="text-center my-5">
             <div class="spinner-border text-primary" role="status"></div>
             <p>Loading user permissions...</p>
         </div>
     `;
-    handleMenuClick(loadUserPermissionsOverview);
+    if (clockInterval) clearInterval(clockInterval); // Stop clock updates
+    handleMenuClick(() => loadUserPermissionsOverview(1));
 });
 
 document.getElementById("profileLink").addEventListener("click", (e) => {
     e.preventDefault();
+    localStorage.setItem("currentPage", "profile");
+    if (clockInterval) clearInterval(clockInterval); // Stop clock updates
     handleMenuClick(loadProfile);
 });
 
 // Initial load
-loadUserList();
+async function initialLoad() {
+    const currentPage = localStorage.getItem("currentPage") || "dashboard"; // Default to dashboard if no page is stored
+    const user = await fetchCurrentUser();
 
-// Load dashboard on page load
-window.addEventListener("DOMContentLoaded", () => {
-    loadUserList();
-    loadDashboard();
-});
+    if (!user) {
+        showLoginRequiredMessage();
+        return;
+    }
+
+    // Show loading spinner for the selected page
+    document.getElementById("mainContent").innerHTML = `
+        <div class="text-center my-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p>Loading ${currentPage}...</p>
+        </div>
+    `;
+
+    // Load the appropriate page based on currentPage
+    switch (currentPage) {
+        case "dashboard":
+            loadDashboard();
+            break;
+        case "departments":
+            if (clockInterval) clearInterval(clockInterval);
+            loadDepartments();
+            break;
+        case "userPermissions":
+            if (clockInterval) clearInterval(clockInterval);
+            loadUserPermissionsOverview(1);
+            break;
+        case "profile":
+            if (clockInterval) clearInterval(clockInterval);
+            loadProfile();
+            break;
+        default:
+            loadDashboard(); // Fallback to dashboard
+            break;
+    }
+}
+
+// Load appropriate page on DOMContentLoaded
+window.addEventListener("DOMContentLoaded", initialLoad);
 </script>
 
 </body>

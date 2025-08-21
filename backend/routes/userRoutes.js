@@ -59,24 +59,53 @@ router.get("/profile", requireLogin, async (req, res) => {
         res.status(500).json({ error: "Server error" });
     }
 });
-
-// Get all users (admin only)
+// Get all users (admin only) with optional search and pagination
 router.get("/", requireLogin, requireAdmin, async (req, res) => {
+    const search = req.query.search || ''; // Get search query
+    const page = parseInt(req.query.page) || 1; // Default to page 1
+    const limit = parseInt(req.query.limit) || 2; // Default to 2 users per page
+
+    // Validate pagination parameters
+    if (page < 1 || limit < 1) {
+        return res.status(400).json({ error: "Invalid page or limit value" });
+    }
+
+    const offset = (page - 1) * limit; // Calculate offset for SQL query
+
     try {
+        // Query to count total users matching the search criteria
+        const [countResult] = await db.query(
+            `SELECT COUNT(*) as totalUsers
+             FROM users
+             WHERE username LIKE ?`,
+            [`%${search}%`]
+        );
+        const totalUsers = countResult[0].totalUsers;
+        const totalPages = Math.ceil(totalUsers / limit);
+
+        // Query to fetch paginated users
         const [rows] = await db.query(
             `SELECT id, username, role,
                     can_add_stock, can_view_stock,
                     can_edit_stock, can_delete_stock,
                     can_add_department, can_assign_department_member
-             FROM users`
+             FROM users
+             WHERE username LIKE ?
+             LIMIT ? OFFSET ?`,
+            [`%${search}%`, limit, offset]
         );
-        res.json(rows);
+
+        // Return paginated users and pagination metadata
+        res.json({
+            users: rows,
+            totalPages: totalPages,
+            totalUsers: totalUsers
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: "Server error" });
     }
 });
-
 // Get single user by ID (admin only)
 router.get("/:id", requireLogin, requireAdmin, async (req, res) => {
     const { id } = req.params;
