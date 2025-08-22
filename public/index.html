@@ -18,52 +18,159 @@
         body {
             min-height: 100vh;
             display: flex;
+            margin: 0;
         }
+
+        /* Sidebar */
         .sidebar {
             width: 250px;
             background-color: #343a40;
             color: white;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            transition: all 0.3s ease-in-out;
+            z-index: 1050;
+            overflow-y: auto;
         }
+
+        .sidebar h4 {
+            margin: 0;
+            padding: 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
         .sidebar a {
             color: white;
             text-decoration: none;
-            display: block;
-            padding: 10px 15px;
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            gap: 10px;
+            white-space: nowrap;
+            overflow: hidden;
         }
+
         .sidebar a:hover {
             background-color: #495057;
         }
+
+        .logout-btn-container {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            padding: 0 15px;
+        }
+
+        /* Desktop: full sidebar */
+        @media (min-width: 1200px) {
+            .sidebar {
+                width: 250px;
+            }
+            .content {
+                margin-left: 250px;
+            }
+            .navbar {
+                display: none !important;
+            }
+        }
+
+        /* Tablet: mini sidebar (icons only) */
+        @media (min-width: 768px) and (max-width: 1199px) {
+            .sidebar {
+                width: 70px;
+            }
+            .sidebar h4 {
+                font-size: 0;
+                padding: 1rem 0.5rem;
+            }
+            .sidebar a span {
+                display: none;
+            }
+            .content {
+                margin-left: 70px;
+            }
+            .navbar {
+                display: none !important;
+            }
+            .logout-btn-container .logout-text {
+                 display: none;
+            }
+        }
+
+        /* Mobile: sidebar with hamburger menu */
+        @media (max-width: 767px) {
+            .sidebar {
+                width: 250px;
+                transform: translateX(-100%);
+            }
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            .content {
+                margin-left: 0;
+                margin-top: 56px;
+            }
+            .overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 1040;
+            }
+            .overlay.active {
+                display: block;
+            }
+            .sortable {
+                padding-right: 30px;
+            }
+            .sortable::after {
+                right: 10px;
+            }
+        }
+
         .content {
             flex: 1;
             padding: 20px;
             background: #f8f9fa;
         }
+
         #calendar {
             position: relative;
             z-index: 1;
+            width: 100%;
+            max-width: 100%;
         }
+
         #clock {
             font-family: monospace;
             font-size: 1.2rem;
         }
-        /* Ensure calendar fits well in smaller size */
+
         .fc {
-            font-size: 0.85em; /* Smaller font for calendar */
+            font-size: 0.85em;
         }
         .fc .fc-daygrid-day {
-            height: 2.5em; /* Reduce day cell height */
+            height: 2.5em;
         }
         .fc .fc-daygrid-day-frame {
-            padding: 2px; /* Reduce padding for compactness */
+            padding: 2px;
         }
-        /* Style for sortable column headers */
+
         .sortable {
             cursor: pointer;
             position: relative;
             padding-right: 20px;
         }
         .sortable::after {
-            content: '\f0dc'; /* Font Awesome sort icon */
+            content: '\f0dc';
             font-family: 'Font Awesome 6 Free';
             font-weight: 900;
             position: absolute;
@@ -71,241 +178,344 @@
             opacity: 0.5;
         }
         .sortable.asc::after {
-            content: '\f0de'; /* Font Awesome sort-up icon */
+            content: '\f0de';
             opacity: 1;
         }
         .sortable.desc::after {
-            content: '\f0dd'; /* Font Awesome sort-down icon */
+            content: '\f0dd';
             opacity: 1;
         }
-        /* Pagination styles */
+
         .pagination {
             margin-top: 15px;
             justify-content: center;
         }
-        /* Logout button styling */
+
         .logout-btn-container {
             padding: 10px 15px;
             border-top: 1px solid rgba(255,255,255,0.2);
         }
+
+        .hidden {
+            display: none;
+        }
+
+        .dropdown-menu {
+            min-width: 200px;
+        }
+
+        /* Ensure calendar responsiveness */
+        @media (max-width: 767px) {
+            .fc {
+                font-size: 0.75em;
+            }
+            .fc .fc-daygrid-day {
+                height: 2em;
+            }
+            #calendar {
+                min-height: 300px;
+            }
+        }
     </style>
 </head>
 <body>
+    <div class="overlay" id="overlay"></div>
 
-<!-- Sidebar -->
-<div class="sidebar">
-    <h4 class="p-3 border-bottom">🏢 Company Name</h4>
-    <a href="#" id="dashboardLink">📊 Dashboard</a>
-    <a href="#" id="departmentLink">📂 Department</a>
-    <a href="#" id="userPermissionLink">🔑 User Permission</a>
-    <a href="#" id="profileLink">👤 Profile</a>
-    <div class="logout-btn-container">
-        <button id="logoutBtn" class="btn btn-danger btn-sm w-100">Logout</button>
-    </div>
-</div>
-
-<!-- Main Content -->
-<div class="content" id="mainContent"></div>
-
-<!-- Scripts -->
-<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/6.1.11/index.global.min.js"></script>
-
-<script>
-let currentUser = null;
-let deptChartInstance = null;
-let roleChartInstance = null;
-let calendar = null;
-let clockInterval = null;
-
-// Get token from localStorage
-function getToken() {
-    return localStorage.getItem("token");
-}
-
-// Fetch logged-in user using JWT
-async function fetchCurrentUser() {
-    const token = getToken();
-    if (!token) {
-        currentUser = null;
-        return null;
-    }
-
-    try {
-        const res = await fetch("http://localhost:3000/me", {
-            headers: { "Authorization": `Bearer ${token}` }
-        });
-        if (!res.ok) { currentUser = null; return null; }
-        currentUser = await res.json();
-        return currentUser;
-    } catch (err) {
-        console.error("Error fetching user:", err);
-        return null;
-    }
-}
-
-// Show login required message
-function showLoginRequiredMessage() {
-    document.getElementById("mainContent").innerHTML = `
-        <h2>🔒 Please log in</h2>
-        <p>You must log in to view this section.</p>
-    `;
-}
-
-// General menu click handler
-async function handleMenuClick(loaderFunction) {
-    const user = await fetchCurrentUser();
-    if (!user) {
-        showLoginRequiredMessage();
-        return;
-    }
-    loaderFunction();
-}
-
-// Load User Permissions Overview with server-side pagination
-async function loadUserPermissionsOverview(page = 1) {
-    const token = getToken();
-    if (!token) return showLoginRequiredMessage();
-
-    const usersPerPage = 2;
-    let users, totalPages;
-    try {
-        const res = await fetch(`http://localhost:3000/users?page=${page}&limit=${usersPerPage}`, {
-            headers: { "Authorization": `Bearer ${token}` }
-        });
-
-        if (!res.ok) {
-            document.getElementById("mainContent").innerHTML = `<p class="text-danger">⚠️ Failed to load users</p>`;
-            return;
-        }
-
-        const data = await res.json();
-        if (!Array.isArray(data.users)) {
-            console.error("Expected users to be an array, got:", data.users);
-            document.getElementById("mainContent").innerHTML = `<p class="text-danger">⚠️ Invalid user data</p>`;
-            return;
-        }
-        users = data.users;
-        totalPages = data.totalPages || Math.ceil(data.totalUsers / usersPerPage);
-    } catch (err) {
-        console.error("Error fetching users:", err);
-        document.getElementById("mainContent").innerHTML = `<p class="text-danger">⚠️ Error fetching users</p>`;
-        return;
-    }
-
-    let html = `
-        <h2>User Permissions</h2>
-        <div class="mb-3">
-            <input type="text" id="userSearch" class="form-control" placeholder="Search users by username...">
+    <div class="sidebar" id="sidebar">
+        <h4 class="p-3 border-bottom"><i class="fas fa-building company-logo"></i> <span class="company-text">Company Name</span></h4>
+        <a href="#" id="dashboardLink"><i class="fas fa-chart-line"></i> <span>Dashboard</span></a>
+        <a href="#" id="departmentLink"><i class="fas fa-building"></i> <span>Department</span></a>
+        <a href="#" id="userPermissionLink"><i class="fas fa-key"></i> <span>User Permission</span></a>
+        <a href="#" id="profileLink"><i class="fas fa-user"></i> <span>Profile</span></a>
+        <div class="logout-btn-container">
+            <button id="logoutBtn" class="btn btn-danger btn-sm w-100"><i class="fa-solid fa-arrow-right-from-bracket"></i> <span class="logout-text">Logout</span></button>
         </div>
-        <table class="table table-bordered table-striped" id="usersTable">
-            <thead>
-                <tr>
-                    <th class="sortable" data-sort="username">Username</th>
-                    <th class="sortable" data-sort="role">Role</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
+    </div>
 
-    users.forEach(u => {
-        html += `
-            <tr>
-                <td>${u.username}</td>
-                <td>${u.role}</td>
-                <td>
-                    <button class="btn btn-sm btn-primary view-btn" data-id="${u.id}">View Permissions</button>
-                </td>
-            </tr>
-        `;
-    });
+    <nav class="navbar navbar-dark bg-dark fixed-top d-lg-none">
+        <div class="container-fluid">
+            <button class="navbar-toggler" type="button" id="menuBtn">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <span class="navbar-brand">🏢 Company Name</span>
+        </div>
+    </nav>
 
-    html += `</tbody></table>`;
+    <div class="content" id="mainContent"></div>
 
-    // Add pagination controls
-    html += `
-        <nav aria-label="User pagination">
-            <ul class="pagination">
-                <li class="page-item ${page === 1 ? 'disabled' : ''}">
-                    <button class="page-link" ${page === 1 ? 'disabled' : ''} data-page="${page - 1}">Previous</button>
-                </li>
-    `;
+    <!-- Toast Container -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <!-- Reminder Toast -->
+        <div id="reminderToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i class="fas fa-bell me-2"></i>
+                <strong class="me-auto">Reminder</strong>
+                <small id="reminderToastTimestamp"></small>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                This is your 10-second reminder!
+            </div>
+        </div>
+        <!-- Login Toast -->
+        <div id="loginToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i class="fas fa-sign-in-alt me-2"></i>
+                <strong class="me-auto">Login</strong>
+                <small id="loginToastTimestamp"></small>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                Successfully logged in!
+            </div>
+        </div>
+        <!-- Logout Toast -->
+        <div id="logoutToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i class="fas fa-sign-out-alt me-2"></i>
+                <strong class="me-auto">Logout</strong>
+                <small id="logoutToastTimestamp"></small>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                Successfully logged out!
+            </div>
+        </div>
+    </div>
 
-    // Determine the range of pages to show (only 2 pages at a time)
-    let startPage = Math.max(1, page - 1);
-    let endPage = Math.min(totalPages, startPage + 1);
-    if (endPage - startPage < 1 && startPage > 1) {
-        startPage = Math.max(1, endPage - 1);
-    }
+    <!-- Delete Warning Modal -->
+    <div class="modal fade" id="deleteDeptModal" tabindex="-1" aria-labelledby="deleteDeptModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h1 class="modal-title fs-5" id="deleteDeptModalLabel">Confirm Delete</h1>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            Are you sure you want to delete this department? This action cannot be undone.
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    for (let i = startPage; i <= endPage; i++) {
-        html += `
-            <li class="page-item ${i === page ? 'active' : ''}">
-                <button class="page-link" data-page="${i}">${i}</button>
-            </li>
-        `;
-    }
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    html += `
-                <li class="page-item ${page === totalPages ? 'disabled' : ''}">
-                    <button class="page-link" ${page === totalPages ? 'disabled' : ''} data-page="${page + 1}">Next</button>
-                </li>
-            </ul>
-        </nav>
-    `;
+    <script>
+        let currentUser = null;
+        let deptChartInstance = null;
+        let roleChartInstance = null;
+        let calendar = null;
+        let clockInterval = null;
 
-    document.getElementById("mainContent").innerHTML = html;
+        function toggleSidebar() {
+            const sidebar = document.getElementById("sidebar");
+            const overlay = document.getElementById("overlay");
+            sidebar.classList.toggle("active");
+            overlay.classList.toggle("active");
+        }
 
-    // Event listener for View buttons
-    document.querySelectorAll(".view-btn").forEach(btn => {
-        btn.addEventListener("click", () => {
-            const userId = btn.dataset.id;
-            loadUserPermissionsDetail(userId);
-        });
-    });
+        document.getElementById("overlay")?.addEventListener("click", toggleSidebar);
+        document.getElementById("menuBtn")?.addEventListener("click", toggleSidebar);
 
-    // Search functionality with server-side pagination
-    const searchInput = document.getElementById("userSearch");
-    searchInput.addEventListener("input", async () => {
-        const query = searchInput.value.trim();
-        try {
-            const res = await fetch(`http://localhost:3000/users?search=${encodeURIComponent(query)}&page=${page}&limit=${usersPerPage}`, {
-                headers: { "Authorization": `Bearer ${getToken()}` }
+        document.querySelectorAll(".sidebar a").forEach(link => {
+            link.addEventListener("click", () => {
+                if (window.innerWidth <= 767) {
+                    toggleSidebar();
+                }
             });
-            if (!res.ok) throw new Error("Failed to fetch users");
+        });
 
-            const data = await res.json();
-            if (!Array.isArray(data.users)) {
-                console.error("Expected users to be an array, got:", data.users);
-                document.querySelector("#usersTable tbody").innerHTML = `<tr><td colspan="3" class="text-danger">Invalid user data</td></tr>`;
+        function getToken() {
+            return localStorage.getItem("token");
+        }
+
+        async function fetchCurrentUser() {
+            const token = getToken();
+            if (!token) {
+                currentUser = null;
+                return null;
+            }
+
+            try {
+                const res = await fetch("http://localhost:3000/me", {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    currentUser = null;
+                    return null;
+                }
+                currentUser = await res.json();
+                return currentUser;
+            } catch (err) {
+                console.error("Error fetching user:", err);
+                return null;
+            }
+        }
+
+        function showLoginRequiredMessage() {
+            document.getElementById("mainContent").innerHTML = `
+                <h2>🔒 Please log in</h2>
+                <p>You must log in to view this section.</p>
+            `;
+            if (window.innerWidth <= 767) {
+                document.getElementById("sidebar").classList.remove("active");
+                document.getElementById("overlay").classList.remove("active");
+            }
+        }
+
+        // Toast Reminder Functionality
+        function initializeToast() {
+            const reminderToastEl = document.getElementById('reminderToast');
+            const reminderToast = new bootstrap.Toast(reminderToastEl);
+
+            function showReminderToast() {
+                const now = new Date();
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                document.getElementById('reminderToastTimestamp').textContent = `${minutes}:${seconds}`;
+                reminderToast.show();
+            }
+
+            showReminderToast();
+            setInterval(showReminderToast, 100000);
+        }
+
+        // Login and Logout Toast Functionality
+        function showLoginToast() {
+            const loginToastEl = document.getElementById('loginToast');
+            const loginToast = new bootstrap.Toast(loginToastEl);
+            const now = new Date();
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('loginToastTimestamp').textContent = `${minutes}:${seconds}`;
+            loginToast.show();
+        }
+
+        function showLogoutToast() {
+            const logoutToastEl = document.getElementById('logoutToast');
+            const logoutToast = new bootstrap.Toast(logoutToastEl);
+            const now = new Date();
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('logoutToastTimestamp').textContent = `${minutes}:${seconds}`;
+            logoutToast.show();
+        }
+
+        async function handleMenuClick(loaderFunction) {
+            const user = await fetchCurrentUser();
+            if (!user) {
+                showLoginRequiredMessage();
                 return;
             }
-            users = data.users;
-            totalPages = data.totalPages || Math.ceil(data.totalUsers / usersPerPage);
+            loaderFunction();
+        }
 
-            const tbody = document.querySelector("#usersTable tbody");
-            tbody.innerHTML = users.map(u => `
-                <tr>
-                    <td>${u.username}</td>
-                    <td>${u.role}</td>
-                    <td>
-                        <button class="btn btn-sm btn-primary view-btn" data-id="${u.id}">View Permissions</button>
-                    </td>
-                </tr>
-            `).join("");
+        async function loadUserPermissionsOverview(page = 1) {
+            const token = getToken();
+            if (!token) return showLoginRequiredMessage();
 
-            // Update pagination controls
-            const pagination = document.querySelector(".pagination");
-            pagination.innerHTML = `
-                <li class="page-item ${page === 1 ? 'disabled' : ''}">
-                    <button class="page-link" ${page === 1 ? 'disabled' : ''} data-page="${page - 1}">Previous</button>
-                </li>
+            const defaultColumns = { username: true, role: true, action: true };
+            let visibleColumns = JSON.parse(localStorage.getItem("visibleColumns")) || defaultColumns;
+            if (!visibleColumns.username && !visibleColumns.role && !visibleColumns.action) {
+                visibleColumns = defaultColumns;
+                localStorage.setItem("visibleColumns", JSON.stringify(visibleColumns));
+            }
+
+            const usersPerPage = 2;
+            let users, totalPages;
+            try {
+                const res = await fetch(`http://localhost:3000/users?page=${page}&limit=${usersPerPage}`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+
+                if (!res.ok) {
+                    document.getElementById("mainContent").innerHTML = `<p class="text-danger">⚠️ Failed to load users</p>`;
+                    return;
+                }
+
+                const data = await res.json();
+                if (!Array.isArray(data.users)) {
+                    console.error("Expected users to be an array, got:", data.users);
+                    document.getElementById("mainContent").innerHTML = `<p class="text-danger">⚠️ Invalid user data</p>`;
+                    return;
+                }
+                users = data.users;
+                totalPages = data.totalPages || Math.ceil(data.totalUsers / usersPerPage);
+            } catch (err) {
+                console.error("Error fetching users:", err);
+                document.getElementById("mainContent").innerHTML = `<p class="text-danger">⚠️ Error fetching users</p>`;
+                return;
+            }
+
+            let html = `
+                <h2>User Permissions</h2>
+                <div class="mb-3 d-flex gap-2 align-items-center">
+                    <input type="text" id="userSearch" class="form-control" placeholder="Search users by username...">
+                    <div class="dropdown">
+                        <button class="btn btn-secondary dropdown-toggle" type="button" id="columnDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            Edit
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="columnDropdown">
+                            <li>
+                                <div class="form-check ms-3">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggleUsername" data-column="username" ${visibleColumns.username ? 'checked' : ''}>
+                                    <label class="form-check-label" for="toggleUsername">Username</label>
+                                </div>
+                            </li>
+                            <li>
+                                <div class="form-check ms-3">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggleRole" data-column="role" ${visibleColumns.role ? 'checked' : ''}>
+                                    <label class="form-check-label" for="toggleRole">Role</label>
+                                </div>
+                            </li>
+                            <li>
+                                <div class="form-check ms-3">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggleAction" data-column="action" ${visibleColumns.action ? 'checked' : ''}>
+                                    <label class="form-check-label" for="toggleAction">Action</label>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <table class="table table-bordered table-striped" id="usersTable">
+                    <thead>
+                        <tr>
+                            ${visibleColumns.username ? '<th class="sortable" data-sort="username">Username</th>' : ''}
+                            ${visibleColumns.role ? '<th class="sortable" data-sort="role">Role</th>' : ''}
+                            ${visibleColumns.action ? '<th>Action</th>' : ''}
+                        </tr>
+                    </thead>
+                    <tbody>
             `;
 
-            // Determine the range of pages to show (only 2 pages at a time)
+            users.forEach(u => {
+                html += `
+                    <tr>
+                        ${visibleColumns.username ? `<td class="username">${u.username}</td>` : ''}
+                        ${visibleColumns.role ? `<td class="role">${u.role}</td>` : ''}
+                        ${visibleColumns.action ? `<td class="action"><button class="btn btn-sm btn-primary view-btn" data-id="${u.id}">View Permissions</button></td>` : ''}
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table>`;
+
+            html += `
+                <nav aria-label="User pagination">
+                    <ul class="pagination">
+                        <li class="page-item ${page === 1 ? 'disabled' : ''}">
+                            <button class="page-link" ${page === 1 ? 'disabled' : ''} data-page="${page - 1}">Previous</button>
+                        </li>
+            `;
+
             let startPage = Math.max(1, page - 1);
             let endPage = Math.min(totalPages, startPage + 1);
             if (endPage - startPage < 1 && startPage > 1) {
@@ -313,20 +523,148 @@ async function loadUserPermissionsOverview(page = 1) {
             }
 
             for (let i = startPage; i <= endPage; i++) {
-                pagination.innerHTML += `
+                html += `
                     <li class="page-item ${i === page ? 'active' : ''}">
                         <button class="page-link" data-page="${i}">${i}</button>
                     </li>
                 `;
             }
 
-            pagination.innerHTML += `
-                <li class="page-item ${page === totalPages ? 'disabled' : ''}">
-                    <button class="page-link" ${page === totalPages ? 'disabled' : ''} data-page="${page + 1}">Next</button>
-                </li>
+            html += `
+                        <li class="page-item ${page === totalPages ? 'disabled' : ''}">
+                            <button class="page-link" ${page === totalPages ? 'disabled' : ''} data-page="${page + 1}">Next</button>
+                        </li>
+                    </ul>
+                </nav>
             `;
 
-            // Re-attach pagination event listeners
+            document.getElementById("mainContent").innerHTML = html;
+
+            document.querySelectorAll(".column-toggle").forEach(checkbox => {
+                checkbox.addEventListener("change", () => {
+                    const column = checkbox.dataset.column;
+                    const countVisible = Array.from(document.querySelectorAll(".column-toggle")).filter(cb => cb.checked).length;
+                    if (!checkbox.checked && countVisible <= 1) {
+                        alert("At least one column must be visible!");
+                        checkbox.checked = true;
+                        return;
+                    }
+                    visibleColumns[column] = checkbox.checked;
+                    localStorage.setItem("visibleColumns", JSON.stringify(visibleColumns));
+                    loadUserPermissionsOverview(page);
+                });
+            });
+
+            document.querySelectorAll(".view-btn").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const userId = btn.dataset.id;
+                    loadUserPermissionsDetail(userId);
+                });
+            });
+
+            const searchInput = document.getElementById("userSearch");
+            searchInput.addEventListener("input", async () => {
+                const query = searchInput.value.trim();
+                try {
+                    const res = await fetch(`http://localhost:3000/users?search=${encodeURIComponent(query)}&page=${page}&limit=${usersPerPage}`, {
+                        headers: { "Authorization": `Bearer ${token}` }
+                    });
+                    if (!res.ok) throw new Error("Failed to fetch users");
+
+                    const data = await res.json();
+                    if (!Array.isArray(data.users)) {
+                        console.error("Expected users to be an array, got:", data.users);
+                        document.querySelector("#usersTable tbody").innerHTML = `<tr><td colspan="${Object.values(visibleColumns).filter(v => v).length}" class="text-danger">Invalid user data</td></tr>`;
+                        return;
+                    }
+                    users = data.users;
+                    totalPages = data.totalPages || Math.ceil(data.totalUsers / usersPerPage);
+
+                    const tbody = document.querySelector("#usersTable tbody");
+                    tbody.innerHTML = users.map(u => `
+                        <tr>
+                            ${visibleColumns.username ? `<td class="username">${u.username}</td>` : ''}
+                            ${visibleColumns.role ? `<td class="role">${u.role}</td>` : ''}
+                            ${visibleColumns.action ? `<td class="action"><button class="btn btn-sm btn-primary view-btn" data-id="${u.id}">View Permissions</button></td>` : ''}
+                        </tr>
+                    `).join("");
+
+                    const pagination = document.querySelector(".pagination");
+                    pagination.innerHTML = `
+                        <li class="page-item ${page === 1 ? 'disabled' : ''}">
+                            <button class="page-link" ${page === 1 ? 'disabled' : ''} data-page="${page - 1}">Previous</button>
+                        </li>
+                    `;
+
+                    for (let i = startPage; i <= endPage; i++) {
+                        pagination.innerHTML += `
+                            <li class="page-item ${i === page ? 'active' : ''}">
+                                <button class="page-link" data-page="${i}">${i}</button>
+                            </li>
+                        `;
+                    }
+
+                    pagination.innerHTML += `
+                        <li class="page-item ${page === totalPages ? 'disabled' : ''}">
+                            <button class="page-link" ${page === totalPages ? 'disabled' : ''} data-page="${page + 1}">Next</button>
+                        </li>
+                    `;
+
+                    document.querySelectorAll(".page-link").forEach(button => {
+                        button.addEventListener("click", () => {
+                            const newPage = parseInt(button.dataset.page);
+                            if (newPage) {
+                                localStorage.setItem("currentPage", "userPermissions");
+                                loadUserPermissionsOverview(newPage);
+                            }
+                        });
+                    });
+
+                    document.querySelectorAll(".view-btn").forEach(btn => {
+                        btn.addEventListener("click", () => {
+                            loadUserPermissionsDetail(btn.dataset.id);
+                        });
+                    });
+                } catch (err) {
+                    console.error(err);
+                    document.querySelector("#usersTable tbody").innerHTML = `<tr><td colspan="${Object.values(visibleColumns).filter(v => v).length}" class="text-danger">Error loading users</td></tr>`;
+                }
+            });
+
+            let sortDirection = { username: 1, role: 1 };
+            const sortTable = (column, direction) => {
+                if (!visibleColumns[column]) return;
+                const tbody = document.querySelector("#usersTable tbody");
+                const rows = Array.from(tbody.querySelectorAll("tr"));
+
+                rows.sort((a, b) => {
+                    const colIndex = column === "username" && visibleColumns.username ? 0 : 
+                                    column === "role" && visibleColumns.role ? (visibleColumns.username ? 1 : 0) : -1;
+                    if (colIndex === -1) return 0;
+                    const aValue = a.cells[colIndex].textContent.toLowerCase();
+                    const bValue = b.cells[colIndex].textContent.toLowerCase();
+                    return direction * (aValue > bValue ? 1 : aValue < bValue ? -1 : 0);
+                });
+
+                tbody.innerHTML = "";
+                rows.forEach(row => tbody.appendChild(row));
+            };
+
+            document.querySelectorAll(".sortable").forEach(header => {
+                header.addEventListener("click", () => {
+                    const column = header.dataset.sort;
+                    if (!visibleColumns[column]) return;
+                    sortDirection[column] = sortDirection[column] === 1 ? -1 : 1;
+
+                    document.querySelectorAll(".sortable").forEach(h => {
+                        h.classList.remove("asc", "desc");
+                    });
+                    header.classList.add(sortDirection[column] === 1 ? "asc" : "desc");
+
+                    sortTable(column, sortDirection[column]);
+                });
+            });
+
             document.querySelectorAll(".page-link").forEach(button => {
                 button.addEventListener("click", () => {
                     const newPage = parseInt(button.dataset.page);
@@ -336,517 +674,497 @@ async function loadUserPermissionsOverview(page = 1) {
                     }
                 });
             });
+        }
 
-            // Re-attach view button listeners
-            document.querySelectorAll(".view-btn").forEach(btn => {
-                btn.addEventListener("click", () => {
-                    loadUserPermissionsDetail(btn.dataset.id);
+        async function loadUserPermissionsDetail(userId) {
+            const token = getToken();
+            if (!token) return showLoginRequiredMessage();
+
+            let user;
+            try {
+                const res = await fetch(`http://localhost:3000/users/${userId}`, { 
+                    headers: { "Authorization": `Bearer ${token}` } 
                 });
-            });
-        } catch (err) {
-            console.error(err);
-            document.querySelector("#usersTable tbody").innerHTML = `<tr><td colspan="3" class="text-danger">Error loading users</td></tr>`;
-        }
-    });
 
-    // Table sorting functionality (client-side)
-    let sortDirection = { username: 1, role: 1 }; // 1 for ascending, -1 for descending
-    const sortTable = (column, direction) => {
-        const tbody = document.querySelector("#usersTable tbody");
-        const rows = Array.from(tbody.querySelectorAll("tr"));
+                if (!res.ok) {
+                    document.getElementById("mainContent").innerHTML = `
+                        <p class="text-danger">⚠️ Failed to load user details (ID: ${userId})</p>
+                    `;
+                    return;
+                }
 
-        rows.sort((a, b) => {
-            const aValue = a.cells[column === "username" ? 0 : 1].textContent.toLowerCase();
-            const bValue = b.cells[column === "username" ? 0 : 1].textContent.toLowerCase();
-            return direction * (aValue > bValue ? 1 : aValue < bValue ? -1 : 0);
-        });
-
-        tbody.innerHTML = "";
-        rows.forEach(row => tbody.appendChild(row));
-    };
-
-    // Add sorting event listeners
-    document.querySelectorAll(".sortable").forEach(header => {
-        header.addEventListener("click", () => {
-            const column = header.dataset.sort;
-            sortDirection[column] = sortDirection[column] === 1 ? -1 : 1;
-
-            // Update sort indicators
-            document.querySelectorAll(".sortable").forEach(h => {
-                h.classList.remove("asc", "desc");
-            });
-            header.classList.add(sortDirection[column] === 1 ? "asc" : "desc");
-
-            // Sort table
-            sortTable(column, sortDirection[column]);
-        });
-    });
-
-    // Pagination event listeners
-    document.querySelectorAll(".page-link").forEach(button => {
-        button.addEventListener("click", () => {
-            const newPage = parseInt(button.dataset.page);
-            if (newPage) {
-                localStorage.setItem("currentPage", "userPermissions");
-                loadUserPermissionsOverview(newPage);
-            }
-        });
-    });
-}
-
-// Load User Permissions Detail
-async function loadUserPermissionsDetail(userId) {
-    const token = getToken();
-    if (!token) return showLoginRequiredMessage();
-
-    let user;
-    try {
-        const res = await fetch(`http://localhost:3000/users/${userId}`, { 
-            headers: { "Authorization": `Bearer ${token}` } 
-        });
-
-        if (!res.ok) {
-            document.getElementById("mainContent").innerHTML = `
-                <p class="text-danger">⚠️ Failed to load user details (ID: ${userId})</p>
-            `;
-            return;
-        }
-
-        user = await res.json();
-    } catch (err) {
-        console.error("Error fetching user:", err);
-        document.getElementById("mainContent").innerHTML = `
-            <p class="text-danger">⚠️ Error fetching user data</p>
-        `;
-        return;
-    }
-
-    const permissions = [
-        { key: "can_add_stock", label: "Add Stock", value: user.can_add_stock },
-        { key: "can_view_stock", label: "View Stock", value: user.can_view_stock },
-        { key: "can_edit_stock", label: "Edit Stock", value: user.can_edit_stock },
-        { key: "can_delete_stock", label: "Delete Stock", value: user.can_delete_stock },
-        { key: "can_add_department", label: "Add Department", value: user.can_add_department },
-        { key: "can_assign_department_member", label: "Assign Department Member", value: user.can_assign_department_member }
-    ];
-
-    permissions.sort((a, b) => b.value - a.value);
-
-    let html = `
-        <h2>Permissions for ${user.username}</h2>
-        <ul id="permList" class="list-group mb-3">
-    `;
-
-    permissions.forEach(p => {
-        html += `
-            <li class="list-group-item d-flex justify-content-between align-items-center" data-key="${p.key}">
-                <span>${p.label}</span>
-                <input type="checkbox" class="perm-checkbox" ${p.value ? "checked" : ""}>
-            </li>
-        `;
-    });
-
-    html += `</ul>
-        <button id="savePermsBtn" class="btn btn-success">Save</button>
-        <button id="backBtn" class="btn btn-secondary ms-2">Back</button>
-    `;
-
-    document.getElementById("mainContent").innerHTML = html;
-
-    if (window.$) {
-        $("#permList").sortable();
-        $("#permList").disableSelection();
-    }
-
-    document.getElementById("savePermsBtn").addEventListener("click", async () => {
-        const data = {};
-        document.querySelectorAll("#permList li").forEach(li => {
-            const key = li.dataset.key;
-            data[key] = li.querySelector(".perm-checkbox").checked ? 1 : 0;
-        });
-
-        try {
-            const updateRes = await fetch(`http://localhost:3000/users/${userId}`, {
-                method: "PUT",
-                headers: { 
-                    "Content-Type": "application/json", 
-                    "Authorization": `Bearer ${token}` 
-                },
-                body: JSON.stringify(data)
-            });
-
-            if (updateRes.ok) {
-                alert("Permissions updated!");
-                localStorage.setItem("currentPage", "userPermissions");
-                loadUserPermissionsOverview();
-            } else {
-                const errText = await updateRes.text();
-                alert("Failed to update permissions: " + errText);
-            }
-        } catch (err) {
-            console.error("Error updating permissions:", err);
-            alert("Error updating permissions");
-        }
-    });
-
-    document.getElementById("backBtn").addEventListener("click", () => {
-        localStorage.setItem("currentPage", "userPermissions");
-        loadUserPermissionsOverview();
-    });
-}
-
-// Load Profile
-function loadProfile() {
-    if (!currentUser) return showLoginRequiredMessage();
-
-    document.getElementById("mainContent").innerHTML = `
-        <h2>Profile</h2>
-        <table class="table table-striped table-bordered w-50">
-            <tbody>
-                <tr><th>Username</th><td>${currentUser.username}</td></tr>
-                <tr><th>Role</th><td>${currentUser.role}</td></tr>
-                <tr><th>Can Add Stock</th><td>${currentUser.can_add_stock ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>'}</td></tr>
-                <tr><th>Can View Stock</th><td>${currentUser.can_view_stock ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>'}</td></tr>
-                <tr><th>Can Edit Stock</th><td>${currentUser.can_edit_stock ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>'}</td></tr>
-                <tr><th>Can Delete Stock</th><td>${currentUser.can_delete_stock ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>'}</td></tr>
-                <tr><th>Can Add Department</th><td>${currentUser.can_add_department ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>'}</td></tr>
-                <tr><th>Can Assign Department Member</th><td>${currentUser.can_assign_department_member ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>'}</td></tr>
-            </tbody>
-        </table>
-    `;
-}
-
-// Departments loader
-async function loadDepartments() {
-    const token = getToken();
-    if (!token) return showLoginRequiredMessage();
-
-    document.getElementById("mainContent").innerHTML = `<h3>Departments</h3><p>⏳ Loading departments...</p>`;
-
-    try {
-        const res = await fetch("http://localhost:3000/api/departments", {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) throw new Error("Failed to load departments");
-        const depts = await res.json();
-
-        let html = `
-            <div class="card">
-                <div class="card-header bg-primary text-white"><h4 class="mb-0">Departments</h4></div>
-                <div class="card-body">
-                    <div id="deptAddSection" class="mb-3 d-flex gap-2">
-                        <input type="text" id="deptName" class="form-control" placeholder="Enter department name">
-                        <button id="addDeptBtn" class="btn btn-success">Add</button>
-                    </div>
-                    <table class="table table-bordered table-striped">
-                        <thead><tr><th>Name</th><th>Action</th></tr></thead>
-                        <tbody>
-        `;
-        depts.forEach(d => {
-            html += `<tr>
-                        <td>${d.name}</td>
-                        <td>
-                            ${currentUser.role === "master" || currentUser.can_delete_department
-                                ? `<button class="btn btn-sm btn-danger delete-btn" data-id="${d.id}">Delete</button>`
-                                : `<button class="btn btn-sm btn-secondary" disabled>Locked</button>`
-                            }
-                        </td>
-                     </tr>`;
-        });
-        html += `</tbody></table></div></div>`;
-        document.getElementById("mainContent").innerHTML = html;
-
-        if (currentUser.role !== "master" && !currentUser.can_add_department) {
-            document.getElementById("deptAddSection").style.display = "none";
-        }
-
-        document.getElementById("addDeptBtn")?.addEventListener("click", async () => {
-            const name = document.getElementById("deptName").value.trim();
-            if (!name) return alert("Enter a department name");
-            const res = await fetch("http://localhost:3000/api/departments", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ name })
-            });
-            if (res.ok) { alert("Department added!"); loadDepartments(); }
-            else alert("Failed to add department");
-        });
-
-        document.querySelectorAll(".delete-btn").forEach(btn => {
-            btn.addEventListener("click", async () => {
-                if (!confirm("Delete this department?")) return;
-                const deptId = btn.dataset.id;
-                const delRes = await fetch(`http://localhost:3000/api/departments/${deptId}`, {
-                    method: "DELETE",
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                if (delRes.ok) { alert("Department deleted"); loadDepartments(); }
-                else alert("Failed to delete department");
-            });
-        });
-
-    } catch (err) {
-        console.error(err);
-        document.getElementById("mainContent").innerHTML = `<h3>Departments</h3><p class="text-danger">⚠️ Failed to load departments.</p>`;
-    }
-}
-
-// Function to greet user based on time
-function getGreeting() {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good Morning";
-    if (hour < 18) return "Good Afternoon";
-    return "Good Evening";
-}
-
-// Function to format and update clock
-function updateClock() {
-    const now = new Date();
-    const hours = now.getHours() % 12 || 12; // Convert to 12-hour format
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
-    const ampm = now.getHours() >= 12 ? 'PM' : 'AM';
-    const timeString = `${hours}:${minutes}:${seconds} ${ampm}`;
-    const clockElement = document.getElementById("clock");
-    if (clockElement) {
-        clockElement.textContent = timeString;
-    }
-}
-
-// Load Dashboard
-async function loadDashboard() {
-    const user = await fetchCurrentUser();
-    if (!user) return showLoginRequiredMessage();
-
-    document.getElementById("mainContent").innerHTML = `
-        <div class="mb-4">
-            <h2>${getGreeting()}, ${user.username} 👋</h2>
-            <p>Here’s a quick overview of your system. Current time: <span id="clock" class="badge bg-primary"></span></p>
-        </div>
-
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="card p-3 shadow-sm">
-                    <h5>Department Overview</h5>
-                    <div style="height:300px">
-                        <canvas id="deptChart"></canvas>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card p-3 shadow-sm">
-                    <h5>User Roles</h5>
-                    <div style="height:300px">
-                        <canvas id="roleChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="col-6 mx-auto">
-                <div class="card p-3 shadow-sm">
-                    <h5>Calendar</h5>
-                    <div id="calendar"></div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    // Start clock
-    updateClock(); // Initial call
-    if (clockInterval) clearInterval(clockInterval); // Clear any existing interval
-    clockInterval = setInterval(updateClock, 1000); // Update every second
-
-    // Destroy old charts before recreating
-    if (deptChartInstance) deptChartInstance.destroy();
-    if (roleChartInstance) roleChartInstance.destroy();
-
-    // Department Chart
-    try {
-        const deptCtx = document.getElementById("deptChart").getContext("2d");
-        deptChartInstance = new Chart(deptCtx, {
-            type: "bar",
-            data: {
-                labels: ["IT", "HR", "Sales", "Marketing", "Finance"],
-                datasets: [{
-                    label: "Members",
-                    data: [12, 8, 15, 7, 10],
-                    backgroundColor: "rgba(54, 162, 235, 0.7)"
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-    } catch (err) {
-        console.error("Error initializing department chart:", err);
-    }
-
-    // Role Chart
-    try {
-        const roleCtx = document.getElementById("roleChart").getContext("2d");
-        roleChartInstance = new Chart(roleCtx, {
-            type: "pie",
-            data: {
-                labels: ["Admin", "Manager", "Staff"],
-                datasets: [{
-                    data: [3, 5, 12],
-                    backgroundColor: [
-                        "rgba(255, 99, 132, 0.7)",
-                        "rgba(54, 162, 235, 0.7)",
-                        "rgba(255, 206, 86, 0.7)"
-                    ]
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-    } catch (err) {
-        console.error("Error initializing role chart:", err);
-    }
-
-    // Initialize Calendar with delay and error handling
-    const initializeCalendar = () => {
-        try {
-            if (typeof FullCalendar === "undefined") {
-                console.error("FullCalendar library not loaded!");
-                document.getElementById("calendar").innerHTML = `<p class="text-danger">Failed to load calendar. Please check your internet connection or try again later.</p>`;
+                user = await res.json();
+            } catch (err) {
+                console.error("Error fetching user:", err);
+                document.getElementById("mainContent").innerHTML = `
+                    <p class="text-danger">⚠️ Error fetching user data</p>
+                `;
                 return;
             }
 
-            if (calendar) calendar.destroy();
-            const calendarEl = document.getElementById("calendar");
-            if (calendarEl) {
-                calendar = new FullCalendar.Calendar(calendarEl, {
-                    initialView: 'dayGridMonth',
-                    height: 350, // Reduced height for smaller calendar
-                    dayMaxEvents: 2, // Limit events per day to avoid overflow
-                    events: [
-                        { title: 'Team Meeting', start: '2025-08-21' },
-                        { title: 'Project Deadline', start: '2025-08-25' },
-                        { title: 'HR Event', start: '2025-08-28' }
-                    ],
-                    eventDisplay: 'block', // Ensure events are compact
-                    headerToolbar: {
-                        left: 'prev,next',
-                        center: 'title',
-                        right: 'dayGridMonth' // Lock to month view
+            const permissions = [
+                { key: "can_add_stock", label: "Add Stock", value: user.can_add_stock },
+                { key: "can_view_stock", label: "View Stock", value: user.can_view_stock },
+                { key: "can_edit_stock", label: "Edit Stock", value: user.can_edit_stock },
+                { key: "can_delete_stock", label: "Delete Stock", value: user.can_delete_stock },
+                { key: "can_add_department", label: "Add Department", value: user.can_add_department },
+                { key: "can_assign_department_member", label: "Assign Department Member", value: user.can_assign_department_member }
+            ];
+
+            permissions.sort((a, b) => b.value - a.value);
+
+            let html = `
+                <h2>Permissions for ${user.username}</h2>
+                <ul id="permList" class="list-group mb-3">
+            `;
+
+            permissions.forEach(p => {
+                html += `
+                    <li class="list-group-item d-flex justify-content-between align-items-center" data-key="${p.key}">
+                        <span>${p.label}</span>
+                        <input type="checkbox" class="perm-checkbox" ${p.value ? "checked" : ""}>
+                    </li>
+                `;
+            });
+
+            html += `</ul>
+                <button id="savePermsBtn" class="btn btn-success">Save</button>
+                <button id="backBtn" class="btn btn-secondary ms-2">Back</button>
+            `;
+
+            document.getElementById("mainContent").innerHTML = html;
+
+            if (window.$) {
+                $("#permList").sortable();
+                $("#permList").disableSelection();
+            }
+
+            document.getElementById("savePermsBtn").addEventListener("click", async () => {
+                const data = {};
+                document.querySelectorAll("#permList li").forEach(li => {
+                    const key = li.dataset.key;
+                    data[key] = li.querySelector(".perm-checkbox").checked ? 1 : 0;
+                });
+
+                try {
+                    const updateRes = await fetch(`http://localhost:3000/users/${userId}`, {
+                        method: "PUT",
+                        headers: { 
+                            "Content-Type": "application/json", 
+                            "Authorization": `Bearer ${token}` 
+                        },
+                        body: JSON.stringify(data)
+                    });
+
+                    if (updateRes.ok) {
+                        alert("Permissions updated!");
+                        localStorage.setItem("currentPage", "userPermissions");
+                        loadUserPermissionsOverview();
+                    } else {
+                        const errText = await updateRes.text();
+                        alert("Failed to update permissions: " + errText);
+                    }
+                } catch (err) {
+                    console.error("Error updating permissions:", err);
+                    alert("Error updating permissions");
+                }
+            });
+
+            document.getElementById("backBtn").addEventListener("click", () => {
+                localStorage.setItem("currentPage", "userPermissions");
+                loadUserPermissionsOverview();
+            });
+        }
+
+        function loadProfile() {
+            if (!currentUser) return showLoginRequiredMessage();
+
+            document.getElementById("mainContent").innerHTML = `
+                <h2>Profile</h2>
+                <table class="table table-striped table-bordered w-50">
+                    <tbody>
+                        <tr><th>Username</th><td>${currentUser.username}</td></tr>
+                        <tr><th>Role</th><td>${currentUser.role}</td></tr>
+                        <tr><th>Can Add Stock</th><td>${currentUser.can_add_stock ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>'}</td></tr>
+                        <tr><th>Can View Stock</th><td>${currentUser.can_view_stock ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>'}</td></tr>
+                        <tr><th>Can Edit Stock</th><td>${currentUser.can_edit_stock ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>'}</td></tr>
+                        <tr><th>Can Delete Stock</th><td>${currentUser.can_delete_stock ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>'}</td></tr>
+                        <tr><th>Can Add Department</th><td>${currentUser.can_add_department ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>'}</td></tr>
+                        <tr><th>Can Assign Department Member</th><td>${currentUser.can_assign_department_member ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>'}</td></tr>
+                    </tbody>
+                </table>
+            `;
+        }
+
+        async function loadDepartments() {
+            const token = getToken();
+            if (!token) return showLoginRequiredMessage();
+
+            document.getElementById("mainContent").innerHTML = `<h3>Departments</h3><p>⏳ Loading departments...</p>`;
+
+            try {
+                const res = await fetch("http://localhost:3000/api/departments", {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error("Failed to load departments");
+                const depts = await res.json();
+
+                let html = `
+                    <div class="card">
+                        <div class="card-header bg-primary text-white"><h4 class="mb-0">Departments</h4></div>
+                        <div class="card-body">
+                            <div id="deptAddSection" class="mb-3 d-flex gap-2">
+                                <input type="text" id="deptName" class="form-control" placeholder="Enter department name">
+                                <button id="addDeptBtn" class="btn btn-success">Add</button>
+                            </div>
+                            <table class="table table-bordered table-striped">
+                                <thead><tr><th>Name</th><th>Action</th></tr></thead>
+                                <tbody>
+                `;
+                depts.forEach(d => {
+                    html += `<tr>
+                                <td>${d.name}</td>
+                                <td>
+                                    ${currentUser.role === "master" || currentUser.can_delete_department
+                                        ? `<button class="btn btn-sm btn-danger delete-btn" data-id="${d.id}" data-bs-toggle="modal" data-bs-target="#deleteDeptModal">Delete</button>`
+                                        : `<button class="btn btn-sm btn-secondary" disabled>Locked</button>`
+                                    }
+                                </td>
+                             </tr>`;
+                });
+                html += `</tbody></table></div></div>`;
+                document.getElementById("mainContent").innerHTML = html;
+
+                if (currentUser.role !== "master" && !currentUser.can_add_department) {
+                    document.getElementById("deptAddSection").style.display = "none";
+                }
+
+                document.getElementById("addDeptBtn")?.addEventListener("click", async () => {
+                    const name = document.getElementById("deptName").value.trim();
+                    if (!name) return alert("Enter a department name");
+                    const res = await fetch("http://localhost:3000/api/departments", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ name })
+                    });
+                    if (res.ok) {
+                        alert("Department added!");
+                        loadDepartments();
+                    } else {
+                        alert("Failed to add department");
                     }
                 });
-                calendar.render();
-                console.log("Calendar initialized successfully");
-            } else {
-                console.error("Calendar element not found!");
-                document.getElementById("calendar").innerHTML = `<p class="text-danger">Calendar element not found!</p>`;
+
+                let deptIdToDelete = null;
+                const deleteModal = new bootstrap.Modal(document.getElementById('deleteDeptModal'));
+                document.querySelectorAll(".delete-btn").forEach(btn => {
+                    btn.addEventListener("click", () => {
+                        deptIdToDelete = btn.dataset.id;
+                        deleteModal.show();
+                    });
+                });
+
+                document.getElementById("confirmDeleteBtn").addEventListener("click", async () => {
+                    if (!deptIdToDelete) return;
+                    const delRes = await fetch(`http://localhost:3000/api/departments/${deptIdToDelete}`, {
+                        method: "DELETE",
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (delRes.ok) {
+                        alert("Department deleted");
+                        loadDepartments();
+                    } else {
+                        alert("Failed to delete department");
+                    }
+                    deleteModal.hide();
+                    deptIdToDelete = null;
+                });
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById("mainContent").innerHTML = `<h3>Departments</h3><p class="text-danger">⚠️ Failed to load departments.</p>`;
             }
-        } catch (err) {
-            console.error("Error initializing calendar:", err);
-            document.getElementById("calendar").innerHTML = `<p class="text-danger">Error loading calendar: ${err.message}</p>`;
         }
-    };
 
-    // Delay calendar initialization to ensure script is loaded
-    setTimeout(initializeCalendar, 100);
-}
+        function getGreeting() {
+            const hour = new Date().getHours();
+            if (hour < 12) return "Good Morning";
+            if (hour < 18) return "Good Afternoon";
+            return "Good Evening";
+        }
 
-// Logout
-document.getElementById("logoutBtn").addEventListener("click", () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("currentPage"); // Clear current page on logout
-    currentUser = null;
-    showLoginRequiredMessage();
-    window.location.href = "login.html";
-    if (clockInterval) clearInterval(clockInterval); // Stop clock updates
-});
+        function updateClock() {
+            const now = new Date();
+            const hours = now.getHours() % 12 || 12;
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const ampm = now.getHours() >= 12 ? 'PM' : 'AM';
+            const timeString = `${hours}:${minutes}:${seconds} ${ampm}`;
+            const clockElement = document.getElementById("clock");
+            if (clockElement) {
+                clockElement.textContent = timeString;
+            }
+        }
 
-// Sidebar navigation events
-document.getElementById("dashboardLink").addEventListener("click", (e) => {
-    e.preventDefault();
-    localStorage.setItem("currentPage", "dashboard");
-    document.getElementById("mainContent").innerHTML = `
-        <div class="text-center my-5">
-            <div class="spinner-border text-primary" role="status"></div>
-            <p>Loading dashboard...</p>
-        </div>
-    `;
-    handleMenuClick(loadDashboard);
-});
+        async function loadDashboard() {
+            const user = await fetchCurrentUser();
+            if (!user) return showLoginRequiredMessage();
 
-document.getElementById("departmentLink").addEventListener("click", async (e) => {
-    e.preventDefault();
-    localStorage.setItem("currentPage", "departments");
-    document.getElementById("mainContent").innerHTML = `
-        <div class="text-center my-5">
-            <div class="spinner-border text-primary" role="status"></div>
-            <p>Loading departments...</p>
-        </div>
-    `;
-    if (clockInterval) clearInterval(clockInterval); // Stop clock updates
-    handleMenuClick(loadDepartments);
-});
+            document.getElementById("mainContent").innerHTML = `
+                <div class="mb-4">
+                    <h2>${getGreeting()}, ${user.username} 👋</h2>
+                    <p>Here’s a quick overview of your system. Current time: <span id="clock" class="badge bg-primary"></span></p>
+                </div>
 
-document.getElementById("userPermissionLink").addEventListener("click", (e) => {
-    e.preventDefault();
-    localStorage.setItem("currentPage", "userPermissions");
-    document.getElementById("mainContent").innerHTML = `
-        <div class="text-center my-5">
-            <div class="spinner-border text-primary" role="status"></div>
-            <p>Loading user permissions...</p>
-        </div>
-    `;
-    if (clockInterval) clearInterval(clockInterval); // Stop clock updates
-    handleMenuClick(() => loadUserPermissionsOverview(1));
-});
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card p-3 shadow-sm">
+                            <h5>Department Overview</h5>
+                            <div style="height:300px">
+                                <canvas id="deptChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card p-3 shadow-sm">
+                            <h5>User Roles</h5>
+                            <div style="height:300px">
+                                <canvas id="roleChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-document.getElementById("profileLink").addEventListener("click", (e) => {
-    e.preventDefault();
-    localStorage.setItem("currentPage", "profile");
-    if (clockInterval) clearInterval(clockInterval); // Stop clock updates
-    handleMenuClick(loadProfile);
-});
+                <div class="row">
+                    <div class="col-12 col-md-6 mx-auto">
+                        <div class="card p-3 shadow-sm">
+                            <h5>Calendar</h5>
+                            <div id="calendar" class="calendar-container"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
 
-// Initial load
-async function initialLoad() {
-    const currentPage = localStorage.getItem("currentPage") || "dashboard"; // Default to dashboard if no page is stored
-    const user = await fetchCurrentUser();
-
-    if (!user) {
-        showLoginRequiredMessage();
-        return;
-    }
-
-    // Show loading spinner for the selected page
-    document.getElementById("mainContent").innerHTML = `
-        <div class="text-center my-5">
-            <div class="spinner-border text-primary" role="status"></div>
-            <p>Loading ${currentPage}...</p>
-        </div>
-    `;
-
-    // Load the appropriate page based on currentPage
-    switch (currentPage) {
-        case "dashboard":
-            loadDashboard();
-            break;
-        case "departments":
+            updateClock();
             if (clockInterval) clearInterval(clockInterval);
-            loadDepartments();
-            break;
-        case "userPermissions":
-            if (clockInterval) clearInterval(clockInterval);
-            loadUserPermissionsOverview(1);
-            break;
-        case "profile":
-            if (clockInterval) clearInterval(clockInterval);
-            loadProfile();
-            break;
-        default:
-            loadDashboard(); // Fallback to dashboard
-            break;
-    }
-}
+            clockInterval = setInterval(updateClock, 1000);
 
-// Load appropriate page on DOMContentLoaded
-window.addEventListener("DOMContentLoaded", initialLoad);
-</script>
+            if (deptChartInstance) deptChartInstance.destroy();
+            if (roleChartInstance) roleChartInstance.destroy();
 
+            try {
+                const deptCtx = document.getElementById("deptChart").getContext("2d");
+                deptChartInstance = new Chart(deptCtx, {
+                    type: "bar",
+                    data: {
+                        labels: ["IT", "HR", "Sales", "Marketing", "Finance"],
+                        datasets: [{
+                            label: "Members",
+                            data: [12, 8, 15, 7, 10],
+                            backgroundColor: "rgba(54, 162, 235, 0.7)"
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            } catch (err) {
+                console.error("Error initializing department chart:", err);
+            }
+
+            try {
+                const roleCtx = document.getElementById("roleChart").getContext("2d");
+                roleChartInstance = new Chart(roleCtx, {
+                    type: "pie",
+                    data: {
+                        labels: ["Admin", "Manager", "Staff"],
+                        datasets: [{
+                            data: [3, 5, 12],
+                            backgroundColor: [
+                                "rgba(255, 99, 132, 0.7)",
+                                "rgba(54, 162, 235, 0.7)",
+                                "rgba(255, 206, 86, 0.7)"
+                            ]
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            } catch (err) {
+                console.error("Error initializing role chart:", err);
+            }
+
+            const initializeCalendar = (attempt = 1, maxAttempts = 5) => {
+                try {
+                    if (typeof FullCalendar === "undefined") {
+                        if (attempt < maxAttempts) {
+                            console.warn(`FullCalendar not loaded, retrying (${attempt}/${maxAttempts})...`);
+                            setTimeout(() => initializeCalendar(attempt + 1, maxAttempts), 500);
+                            return;
+                        } else {
+                            console.error("FullCalendar library failed to load after multiple attempts.");
+                            document.getElementById("calendar").innerHTML = `
+                                <p class="text-danger">⚠️ Failed to load calendar. Please check your internet connection and try again.</p>
+                            `;
+                            return;
+                        }
+                    }
+
+                    if (calendar) calendar.destroy();
+                    const calendarEl = document.getElementById("calendar");
+                    if (!calendarEl) {
+                        console.error("Calendar element not found!");
+                        document.getElementById("calendar").innerHTML = `
+                            <p class="text-danger">⚠️ Calendar container not found.</p>
+                        `;
+                        return;
+                    }
+
+                    calendar = new FullCalendar.Calendar(calendarEl, {
+                        initialView: 'dayGridMonth',
+                        height: 'auto',
+                        dayMaxEvents: 2,
+                        events: [
+                            { title: 'Team Meeting', start: '2025-08-21' },
+                            { title: 'Project Deadline', start: '2025-08-25' },
+                            { title: 'HR Event', start: '2025-08-28' }
+                        ],
+                        eventDisplay: 'block',
+                        headerToolbar: {
+                            left: 'prev,next',
+                            center: 'title',
+                            right: 'dayGridMonth'
+                        },
+                        eventTimeFormat: {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            meridiem: 'short'
+                        },
+                        displayEventTime: false,
+                        eventDidMount: function(info) {
+                            info.el.style.fontSize = window.innerWidth <= 767 ? '0.8em' : '0.9em';
+                        }
+                    });
+
+                    calendar.render();
+                    console.log("Calendar initialized successfully on attempt", attempt);
+
+                    window.addEventListener('resize', () => {
+                        if (calendar) {
+                            calendar.updateSize();
+                        }
+                    });
+                } catch (err) {
+                    console.error("Error initializing calendar:", err);
+                    document.getElementById("calendar").innerHTML = `
+                        <p class="text-danger">⚠️ Error loading calendar: ${err.message}</p>
+                    `;
+                }
+            };
+
+            setTimeout(() => initializeCalendar(), 100);
+        }
+
+        document.getElementById("logoutBtn").addEventListener("click", () => {
+            localStorage.removeItem("token");
+            localStorage.removeItem("currentPage");
+            localStorage.removeItem("visibleColumns");
+            currentUser = null;
+            showLoginRequiredMessage();
+            showLogoutToast(); // Show logout toast before redirect
+            setTimeout(() => {
+                window.location.href = "login.html";
+            }, 1000); // Delay redirect to allow toast to be visible
+            if (clockInterval) clearInterval(clockInterval);
+        });
+
+        document.getElementById("dashboardLink").addEventListener("click", (e) => {
+            e.preventDefault();
+            localStorage.setItem("currentPage", "dashboard");
+            document.getElementById("mainContent").innerHTML = `
+                <div class="text-center my-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p>Loading dashboard...</p>
+                </div>
+            `;
+            handleMenuClick(loadDashboard);
+        });
+
+        document.getElementById("departmentLink").addEventListener("click", async (e) => {
+            e.preventDefault();
+            localStorage.setItem("currentPage", "departments");
+            document.getElementById("mainContent").innerHTML = `
+                <div class="text-center my-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p>Loading departments...</p>
+                </div>
+            `;
+            if (clockInterval) clearInterval(clockInterval);
+            handleMenuClick(loadDepartments);
+        });
+
+        document.getElementById("userPermissionLink").addEventListener("click", (e) => {
+            e.preventDefault();
+            localStorage.setItem("currentPage", "userPermissions");
+            document.getElementById("mainContent").innerHTML = `
+                <div class="text-center my-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p>Loading user permissions...</p>
+                </div>
+            `;
+            if (clockInterval) clearInterval(clockInterval);
+            handleMenuClick(() => loadUserPermissionsOverview(1));
+        });
+
+        document.getElementById("profileLink").addEventListener("click", (e) => {
+            e.preventDefault();
+            localStorage.setItem("currentPage", "profile");
+            if (clockInterval) clearInterval(clockInterval);
+            handleMenuClick(loadProfile);
+        });
+
+        window.addEventListener("DOMContentLoaded", initialLoad);
+
+        async function initialLoad() {
+            const currentPage = localStorage.getItem("currentPage") || "dashboard";
+            const user = await fetchCurrentUser();
+
+            if (!user) {
+                showLoginRequiredMessage();
+                return;
+            }
+
+            // Show login toast after successful user fetch
+            showLoginToast();
+
+            document.getElementById("mainContent").innerHTML = `
+                <div class="text-center my-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p>Loading ${currentPage}...</p>
+                </div>
+            `;
+
+            switch (currentPage) {
+                case "dashboard":
+                    loadDashboard();
+                    break;
+                case "departments":
+                    if (clockInterval) clearInterval(clockInterval);
+                    loadDepartments();
+                    break;
+                case "userPermissions":
+                    if (clockInterval) clearInterval(clockInterval);
+                    loadUserPermissionsOverview(1);
+                    break;
+                case "profile":
+                    if (clockInterval) clearInterval(clockInterval);
+                    loadProfile();
+                    break;
+                default:
+                    loadDashboard();
+                    break;
+            }
+
+            // Initialize reminder toast after page load
+            initializeToast();
+        }
+    </script>
 </body>
 </html>
