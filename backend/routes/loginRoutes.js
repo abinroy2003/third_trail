@@ -23,38 +23,47 @@ function requireLogin(req, res, next) {
 // Login
 
 router.post("/login", async (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, captchaAnswer, captchaExpected } = req.body;
 
-    const [rows] = await db.query(
-        "SELECT * FROM users WHERE username = ? AND password = ?",
-        [username, password]
-    );
-
-    if (rows.length === 0) {
-        return res.status(401).json({ error: "Invalid credentials" });
+    // Verify CAPTCHA
+    if (!captchaAnswer || !captchaExpected || parseInt(captchaAnswer) !== parseInt(captchaExpected)) {
+        return res.status(400).json({ error: "Incorrect CAPTCHA answer" });
     }
 
-    const user = rows[0];
+    try {
+        const [rows] = await db.query(
+            "SELECT * FROM users WHERE username = ? AND password = ?",
+            [username, password]
+        );
 
-    // Generate JWT token including permissions
-    const token = jwt.sign(
-        {
-            id: user.id,
-            role: user.role,
-            can_add_stock: user.can_add_stock,
-            can_view_stock: user.can_view_stock,
-            can_edit_stock: user.can_edit_stock,
-            can_delete_stock: user.can_delete_stock,
-            can_add_department: user.can_add_department,
-            can_assign_department_member: user.can_assign_department_member
-        },
-        JWT_SECRET,
-        { expiresIn: "1h" }
-    );
+        if (rows.length === 0) {
+            return res.status(401).json({ error: "Invalid credentials" });
+        }
 
-    res.json({ message: "Login successful", token });
+        const user = rows[0];
+
+        // Generate JWT token including permissions
+        const token = jwt.sign(
+            {
+                id: user.id,
+                role: user.role,
+                can_add_stock: user.can_add_stock,
+                can_view_stock: user.can_view_stock,
+                can_edit_stock: user.can_edit_stock,
+                can_delete_stock: user.can_delete_stock,
+                can_add_department: user.can_add_department,
+                can_assign_department_member: user.can_assign_department_member
+            },
+            JWT_SECRET,
+            { expiresIn: "1h" }
+        );
+
+        res.json({ message: "Login successful", token });
+    } catch (err) {
+        console.error("Login error:", err);
+        return res.status(500).json({ error: "Server error" });
+    }
 });
-
 // Logout (JWT version just instructs client to delete token)
 router.post("/logout", (req, res) => {
     res.json({ message: "Logged out - please delete the token on client side" });

@@ -10,7 +10,7 @@
 
 <div class="container d-flex justify-content-center align-items-center vh-100">
     <div class="card shadow p-4" style="max-width: 400px; width: 100%;">
-        <h3 class="text-center mb-4"> Login</h3>
+        <h3 class="text-center mb-4">Login</h3>
 
         <div class="mb-3">
             <label for="username" class="form-label fw-bold">Username</label>
@@ -20,6 +20,13 @@
         <div class="mb-3">
             <label for="password" class="form-label fw-bold">Password</label>
             <input type="password" class="form-control" id="password" placeholder="Enter password">
+        </div>
+
+        <!-- Add Math CAPTCHA -->
+        <div class="mb-3">
+            <label for="captcha" class="form-label fw-bold">CAPTCHA: <span id="captchaQuestion"></span></label>
+            <input type="number" class="form-control" id="captchaAnswer" placeholder="Enter answer">
+            <input type="hidden" id="captchaExpected" name="captchaExpected">
         </div>
 
         <button id="loginBtn" class="btn btn-primary w-100">Login</button>
@@ -34,12 +41,33 @@
 </div>
 
 <script>
+// Generate random math CAPTCHA
+function generateCaptcha() {
+    const num1 = Math.floor(Math.random() * 10) + 1; // Random number 1-10
+    const num2 = Math.floor(Math.random() * 10) + 1; // Random number 1-10
+    const answer = num1 + num2;
+    document.getElementById('captchaQuestion').innerText = `What is ${num1} + ${num2}?`;
+    document.getElementById('captchaExpected').value = answer;
+}
+
+// Generate CAPTCHA on page load
+generateCaptcha();
+
 document.getElementById('loginBtn').addEventListener('click', async () => {
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value.trim();
+    const captchaAnswer = document.getElementById('captchaAnswer').value.trim();
+    const captchaExpected = document.getElementById('captchaExpected').value;
 
+    // Validate inputs
     if (!username || !password) {
         document.getElementById('message').innerText = "⚠ Please enter both username and password";
+        document.getElementById('message').classList.add("text-danger");
+        return;
+    }
+
+    if (!captchaAnswer) {
+        document.getElementById('message').innerText = "⚠ Please answer the CAPTCHA";
         document.getElementById('message').classList.add("text-danger");
         return;
     }
@@ -48,10 +76,10 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
         const res = await fetch('http://localhost:3000/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
+            body: JSON.stringify({ username, password, captchaAnswer, captchaExpected })
         });
 
-        const data = await res.json(); // Expecting { token: "..." }
+        const data = await res.json();
 
         if (res.ok) {
             // Store JWT in localStorage
@@ -74,12 +102,18 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
             document.getElementById('message').innerText = data.message || "❌ Login failed";
             document.getElementById('message').classList.remove("text-success");
             document.getElementById('message').classList.add("text-danger");
+            // Regenerate CAPTCHA on failure
+            generateCaptcha();
+            document.getElementById('captchaAnswer').value = '';
         }
     } catch (err) {
         console.error("Login error:", err);
         document.getElementById('message').innerText = "❌ Server error";
         document.getElementById('message').classList.remove("text-success");
         document.getElementById('message').classList.add("text-danger");
+        // Regenerate CAPTCHA on error
+        generateCaptcha();
+        document.getElementById('captchaAnswer').value = '';
     }
 });
 </script>
