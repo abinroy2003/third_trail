@@ -45,7 +45,8 @@ router.get("/profile", requireLogin, async (req, res) => {
         const [rows] = await db.query(
             `SELECT id, username, role,
                     can_add_stock, can_view_stock, 
-                    can_edit_stock, can_delete_stock
+                    can_edit_stock, can_delete_stock,
+                    can_add_department, can_assign_department_member
              FROM users
              WHERE id = ?`,
             [req.user.id]
@@ -59,9 +60,11 @@ router.get("/profile", requireLogin, async (req, res) => {
         res.status(500).json({ error: "Server error" });
     }
 });
-// Get all users (admin only) with optional search and pagination
+
+// Get all users (admin only) with optional search, role filter, and pagination
 router.get("/", requireLogin, requireAdmin, async (req, res) => {
     const search = req.query.search || ''; // Get search query
+    const role = req.query.role || ''; // Get role filter
     const page = parseInt(req.query.page) || 1; // Default to page 1
     const limit = parseInt(req.query.limit) || 2; // Default to 2 users per page
 
@@ -73,12 +76,21 @@ router.get("/", requireLogin, requireAdmin, async (req, res) => {
     const offset = (page - 1) * limit; // Calculate offset for SQL query
 
     try {
-        // Query to count total users matching the search criteria
+        // Build the WHERE clause dynamically
+        let whereClause = 'WHERE username LIKE ?';
+        const queryParams = [`%${search}%`];
+        
+        if (role && ['admin', 'master', 'user'].includes(role)) {
+            whereClause += ' AND role = ?';
+            queryParams.push(role);
+        }
+
+        // Query to count total users matching the search and role criteria
         const [countResult] = await db.query(
             `SELECT COUNT(*) as totalUsers
              FROM users
-             WHERE username LIKE ?`,
-            [`%${search}%`]
+             ${whereClause}`,
+            queryParams
         );
         const totalUsers = countResult[0].totalUsers;
         const totalPages = Math.ceil(totalUsers / limit);
@@ -90,9 +102,9 @@ router.get("/", requireLogin, requireAdmin, async (req, res) => {
                     can_edit_stock, can_delete_stock,
                     can_add_department, can_assign_department_member
              FROM users
-             WHERE username LIKE ?
+             ${whereClause}
              LIMIT ? OFFSET ?`,
-            [`%${search}%`, limit, offset]
+            [...queryParams, limit, offset]
         );
 
         // Return paginated users and pagination metadata
@@ -106,6 +118,7 @@ router.get("/", requireLogin, requireAdmin, async (req, res) => {
         res.status(500).json({ error: "Server error" });
     }
 });
+
 // Get single user by ID (admin only)
 router.get("/:id", requireLogin, requireAdmin, async (req, res) => {
     const { id } = req.params;
